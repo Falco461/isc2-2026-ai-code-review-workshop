@@ -71,7 +71,7 @@ def test_gitlab_without_token_names_the_fix(monkeypatch):
     monkeypatch.delenv("REVIEW_BOT_TOKEN", raising=False)
     target, problem = post_comment.gitlab_target()
     assert target is None
-    assert "personal access token" in problem
+    assert "fine-grained personal access" in problem
 
 
 def test_print_mode_needs_no_ci(tmp_path, capsys):
