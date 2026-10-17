@@ -996,8 +996,16 @@ def main(argv=None):
     rendered = []
 
     if args.no_scanner:
+        # Test files hold the exploits, so a cold review of them reports
+        # the bugs they test as if the bugs lived in the tests. The
+        # scanners still check test files; only the cold review skips them.
+        skipped = [p for p in files if looks_like_test_code(_relative(p))]
+        if skipped:
+            warn("the cold review skips %d test file(s); the scanner path still checks them." % len(skipped))
         for path in files:
             rel = _relative(path)
+            if path in skipped:
+                continue
             found, render = sweep_file(
                 config, prompts, rel, [], args.dry_run,
                 changed=(changed_lines or {}).get(rel),

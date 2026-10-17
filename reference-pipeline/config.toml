@@ -6,6 +6,7 @@
 #   REVIEW_THINK  overrides think
 #   REVIEW_SANITIZE  overrides sanitize_source (1 or 0)
 #   REVIEW_AUDIT_LOG overrides audit_log (a file path)
+#   REVIEW_REPO_READ overrides repo_read (1 or 0)
 
 [model]
 # Default is qwen3.5:9b with reasoning off. In the October 2026 bake-off it
@@ -52,6 +53,14 @@ sanitize_source = false
 # raw answer. Empty means off. REVIEW_AUDIT_LOG overrides. The log holds
 # source code from the review, so treat it like the code.
 audit_log = ""
+
+# Module 8 repo-read tool. With --no-scanner, lets the model read up to
+# four named functions or classes elsewhere in the reviewed file's folder
+# before it reviews. Read-only, Python only, never test files, audited.
+# Off by default because it gives the model a choice of what to read,
+# which Module 8 shows an attacker can steer. --repo-read or
+# REVIEW_REPO_READ turns it on.
+repo_read = false
 
 # Paths never handed to the scanners.
 excluded_paths = [".venv", ".git", ".pytest_cache", "__pycache__", "node_modules"]
