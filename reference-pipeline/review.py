@@ -68,6 +68,30 @@ SWEEP_SCHEMA = {
     "required": ["findings", "no_findings_reason"],
 }
 
+# Module 8 repo-read tool. The model may ask to read named functions or
+# classes elsewhere in the repository before it reviews a file. Limits are
+# enforced here, not requested in the prompt.
+READ_REQUEST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requests": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string"},
+                    "symbol": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["file", "symbol", "reason"],
+            },
+        },
+    },
+    "required": ["requests"],
+}
+READ_MAX_REQUESTS = 4
+READ_MAX_LINES = 80
+
 
 def warn(message):
     """Warnings go to stderr so stdout stays parseable JSON."""
@@ -133,6 +157,8 @@ def load_config(path=CONFIG_PATH):
     sanitize = os.environ.get("REVIEW_SANITIZE", review.get("sanitize_source", False))
     review["sanitize_source"] = str(sanitize).strip().lower() in ("1", "true", "on", "yes")
     review["audit_log"] = os.environ.get("REVIEW_AUDIT_LOG", review.get("audit_log", ""))
+    repo_read = os.environ.get("REVIEW_REPO_READ", review.get("repo_read", False))
+    review["repo_read"] = str(repo_read).strip().lower() in ("1", "true", "on", "yes")
     return config
 
 
@@ -451,6 +477,91 @@ def numbered_source(path, sanitize=False):
     return "\n".join("%d: %s" % (i, line) for i, line in enumerate(text.splitlines(), 1))
 
 
+# -------------------------------------------------------------- repo-read
+
+
+def repo_scope(file_path):
+    """The folder the repo-read tool may read: the reviewed file's top folder."""
+    parts = Path(file_path).parts
+    return (REPO_ROOT / parts[0]).resolve() if len(parts) > 1 else REPO_ROOT.resolve()
+
+
+def repo_index(scope, config):
+    """A menu of readable Python files and the functions and classes in each."""
+    excluded = set(config["review"]["excluded_paths"]) | {"tests"}
+    lines = []
+    for path in sorted(scope.rglob("*.py")):
+        if excluded.intersection(path.relative_to(scope).parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        names = [
+            n.name for n in tree.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        ]
+        lines.append("%s: %s" % (_relative(path), ", ".join(names) or "(no functions)"))
+    return "\n".join(lines)
+
+
+def read_symbol(request, scope, config):
+    """Return (label, numbered source) for one read request, or (label, refusal).
+
+    Read-only, confined to the scope folder, Python files only, never test
+    files, capped at READ_MAX_LINES lines. Sanitizing applies here too.
+    """
+    file_name = str(request.get("file", "")).strip()
+    symbol = str(request.get("symbol", "")).strip()
+    label = "%s: %s" % (file_name, symbol)
+    path = (REPO_ROOT / file_name).resolve()
+    if scope not in path.parents or path.suffix != ".py" or not path.is_file():
+        return label, "refused: only Python files inside %s can be read." % _relative(scope)
+    blocked = {"tests"} | set(config["review"]["excluded_paths"])
+    if blocked & set(path.relative_to(scope).parts):
+        return label, "refused: test and excluded files cannot be read."
+
+    text = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return label, "refused: the file does not parse."
+    node = next(
+        (
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name == symbol
+        ),
+        None,
+    )
+    if node is None:
+        return label, "not found: no function or class named %s in %s." % (symbol, file_name)
+
+    if config["review"]["sanitize_source"]:
+        text = sanitize_python(text)
+    source_lines = text.splitlines()
+    first = min([node.lineno] + [d.lineno for d in node.decorator_list])
+    last = min(node.end_lineno or node.lineno, first + READ_MAX_LINES - 1)
+    body = "\n".join("%d: %s" % (i, source_lines[i - 1]) for i in range(first, last + 1))
+    return label, body
+
+
+def gather_context(config, prompts, file_path, source):
+    """Let the model ask for other code before it reviews file_path."""
+    scope = repo_scope(file_path)
+    user = (
+        "You are about to review %s. Readable code in this repository:\n%s\n\n"
+        "Numbered source of %s:\n%s" % (file_path, repo_index(scope, config), file_path, source)
+    )
+    result = call_model(config, prompts["repo_read"], user, READ_REQUEST_SCHEMA) or {}
+    requests_made = (result.get("requests") or [])[:READ_MAX_REQUESTS]
+    blocks = []
+    for request in requests_made:
+        label, body = read_symbol(request, scope, config)
+        audit(config, "repo-read", label, body[:200])
+        blocks.append("Read %s\n%s" % (label, body))
+    return "\n\n".join(blocks)
+
+
 def call_model(config, system, user, schema):
     """One chat call with schema-constrained decoding."""
     model = config["model"]
@@ -539,6 +650,28 @@ def audit(config, system, user, content):
 # ------------------------------------------------------------- validation
 
 
+def _squash(text):
+    return " ".join(str(text).split())
+
+
+def evidence_matches(evidence, file_path, start, end):
+    """True when the quoted evidence really appears at the cited lines.
+
+    Compares the start of the evidence's first line, ignoring whitespace,
+    with the real file's lines from one before start to one after end. A
+    model that cites line 55 of app.py while quoting auth.py fails this.
+    """
+    path = REPO_ROOT / file_path
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    window = _squash(" ".join(lines[max(start - 2, 0):end + 1]))
+    first = next((line for line in str(evidence).splitlines() if line.strip()), "")
+    probe = _squash(first)[:40]
+    return bool(probe) and probe in window
+
+
 def validate_finding(candidate, file_path, scanner_refs=None, line_budget=None):
     """Enforce citation-required. Returns a finding, or None.
 
@@ -577,6 +710,12 @@ def validate_finding(candidate, file_path, scanner_refs=None, line_budget=None):
     evidence = str(candidate.get("evidence", "")).strip()
     if not evidence:
         warn("dropped '%s': no evidence quoted." % title)
+        return None
+    if (REPO_ROOT / file_path).is_file() and not evidence_matches(evidence, file_path, start, end):
+        warn(
+            "dropped '%s': the quoted evidence is not on lines %d-%d of %s."
+            % (title, start, end, file_path)
+        )
         return None
 
     severity = str(candidate.get("severity", "")).lower()
@@ -654,6 +793,14 @@ def sweep_file(config, prompts, file_path, known, dry_run):
     if dry_run:
         return [], [{"system": prompts["sweep"], "user": user}]
 
+    if config["review"]["repo_read"]:
+        context = gather_context(config, prompts, file_path, source)
+        if context:
+            user += (
+                "\n\nOther code you asked to read. It is context only: cite lines of %s, "
+                "not of these files.\n\n%s" % (file_path, context)
+            )
+
     result = call_model(config, prompts["sweep"], user, SWEEP_SCHEMA)
     if result is None:
         return [], []
@@ -693,6 +840,11 @@ def build_parser():
         action="store_true",
         help="render the prompts and exit without calling the model",
     )
+    parser.add_argument(
+        "--repo-read",
+        action="store_true",
+        help="with --no-scanner, let the model read named functions elsewhere in the repository first",
+    )
     return parser
 
 
@@ -730,6 +882,10 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     config = load_config()
     prompts = load_prompts()
+    if args.repo_read:
+        config["review"]["repo_read"] = True
+    if config["review"]["repo_read"] and "repo_read" not in prompts:
+        fail("repo-read is on, but %s has no '## repo_read' section." % PROMPT_PATH)
 
     files, changed_lines = resolve_targets(args, config)
     target_label = args.file or (args.diff if args.diff else "staged changes")
