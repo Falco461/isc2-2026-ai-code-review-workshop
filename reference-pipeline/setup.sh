@@ -158,9 +158,10 @@ Activate the environment in this shell with:
 
   source .venv/bin/activate
 
-Then review the vulnerable app with:
+Then review the vulnerable app, from the repository root, with:
 
-  cd reference-pipeline
-  python review.py --file ../target-app
+  python reference-pipeline/review.py --file target-app
+
+The lab guides are in lab-guide/. Start with 01-landscape.md.
 
 EOF
