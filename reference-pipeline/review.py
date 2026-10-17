@@ -13,6 +13,7 @@ Exit code is always 0 in this phase. Blocking behavior is a later module.
 
 import argparse
 import ast
+import hashlib
 import io
 import json
 import os
@@ -21,6 +22,7 @@ import subprocess
 import sys
 import tokenize
 import tomllib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import NoReturn
 
@@ -130,6 +132,7 @@ def load_config(path=CONFIG_PATH):
     review.setdefault("excluded_paths", [])
     sanitize = os.environ.get("REVIEW_SANITIZE", review.get("sanitize_source", False))
     review["sanitize_source"] = str(sanitize).strip().lower() in ("1", "true", "on", "yes")
+    review["audit_log"] = os.environ.get("REVIEW_AUDIT_LOG", review.get("audit_log", ""))
     return config
 
 
@@ -471,8 +474,8 @@ def call_model(config, system, user, schema):
         response = requests.post(url, json=payload, timeout=model.get("timeout_seconds", 300))
     except requests.exceptions.ConnectionError:
         fail(
-            "cannot reach Ollama at %s. Start it with 'ollama serve', or set "
-            "OLLAMA_HOST to the instructor-hosted model." % model["host"]
+            "cannot reach Ollama at %s. Start the Ollama app or run 'ollama serve', "
+            "or set OLLAMA_HOST to the machine running Ollama." % model["host"]
         )
     except requests.exceptions.Timeout:
         fail(
@@ -496,10 +499,41 @@ def call_model(config, system, user, schema):
         fail("Ollama returned HTTP %s: %s" % (response.status_code, response.text[:300]))
 
     try:
-        return json.loads(response.json()["message"]["content"])
+        content = response.json()["message"]["content"]
+        result = json.loads(content)
     except (KeyError, ValueError):
         warn("model returned output that was not valid JSON, dropping it.")
-        return None
+        content, result = None, None
+    audit(config, system, user, content)
+    return result
+
+
+def audit(config, system, user, content):
+    """Append one record per model call to the audit log, if one is set.
+
+    Module 6 audit logging. Each record holds the model, its reasoning
+    setting, a sha256 of the exact prompt, the user prompt, and the raw
+    answer, so any verdict can be traced to what produced it. The log
+    contains source code from the review, so treat it like the code.
+    """
+    path = config["review"].get("audit_log")
+    if not path:
+        return
+    prompt = system + "\n\n" + user
+    record = {
+        "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "model": config["model"]["name"],
+        "think": config["model"].get("think"),
+        "sanitized": config["review"].get("sanitize_source", False),
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "user_prompt": user,
+        "answer": content,
+    }
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+    except OSError as exc:
+        warn("could not write the audit log at %s: %s" % (path, exc))
 
 
 # ------------------------------------------------------------- validation

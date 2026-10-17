@@ -5,6 +5,7 @@
 #   REVIEW_MODEL  overrides model
 #   REVIEW_THINK  overrides think
 #   REVIEW_SANITIZE  overrides sanitize_source (1 or 0)
+#   REVIEW_AUDIT_LOG overrides audit_log (a file path)
 
 [model]
 # Default is qwen3.5:9b with reasoning off. In the October 2026 bake-off it
@@ -45,6 +46,12 @@ ignored_rules = ["B404", "B403", "B101"]
 # a Python file. Line numbers do not move. Off on Day 1 so Module 5 can
 # attack the unhardened bot; Module 6 turns it on.
 sanitize_source = false
+
+# Module 6 audit logging. A file path turns it on: one JSON line per model
+# call with the model, a sha256 of the exact prompt, the prompt, and the
+# raw answer. Empty means off. REVIEW_AUDIT_LOG overrides. The log holds
+# source code from the review, so treat it like the code.
+audit_log = ""
 
 # Paths never handed to the scanners.
 excluded_paths = [".venv", ".git", ".pytest_cache", "__pycache__", "node_modules"]

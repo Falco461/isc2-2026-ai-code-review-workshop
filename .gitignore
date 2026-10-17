@@ -19,3 +19,6 @@ findings.json
 .DS_Store
 .vscode/
 .idea/
+
+# Module 6 audit logs hold reviewed source code
+audit*.jsonl
