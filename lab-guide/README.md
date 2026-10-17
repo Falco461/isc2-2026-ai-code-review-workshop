@@ -17,7 +17,11 @@ Step-by-step instructions for every lab. Work through them in order. Each one sa
 
 ## Day 2
 
-Modules 5 to 8 are added before the workshop.
+| Time | Module | Guide |
+|---|---|---|
+| 8:15 | 5. Attacking Your Own Bot | [05-attacking-your-bot.md](05-attacking-your-bot.md) |
+
+Modules 6 to 8 are added before the workshop.
 
 ## Where you are working
 
