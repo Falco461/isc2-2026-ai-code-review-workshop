@@ -7,11 +7,11 @@
 #
 # One setup step: GitLab's built-in job token cannot comment on merge
 # requests, and on GitLab.com Free you cannot create a project access
-# token. Create a personal access token (avatar > Edit profile > Access
-# tokens, scope api, expiry right after the workshop) and add it as a
-# masked CI/CD variable named REVIEW_BOT_TOKEN (Settings > CI/CD >
-# Variables). On Premium or Ultimate, prefer a project access token with
-# role Reporter and scope api: it is limited to this one project.
+# token. Create a fine-grained personal access token with exactly
+# read_work_item, create_work_item and update_work_item (no repository
+# permissions), expiring right after the workshop, and add it as a masked,
+# unprotected CI/CD variable named REVIEW_BOT_TOKEN (Settings > CI/CD >
+# Variables). See ci-templates/README.md.
 #
 # Advisory only: the job never fails the pipeline.
 # The model runs inside the runner. No cloud model.

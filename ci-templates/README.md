@@ -4,7 +4,7 @@ Module 4. The bot reviews only the lines a pull request or merge request changes
 
 The model runs inside the free CI runner. No API keys and no cloud model. The first run downloads the model (about 6.6 GB). Later runs restore it from the CI cache.
 
-**Expect about 8 minutes per pull request.** Measured on a free GitHub runner in October 2026 on the lab change below: about 1 minute to install Ollama, about 6 minutes for the review itself (the runner has no GPU, so the model runs on CPU), and seconds to post. Because the check never blocks the merge, nobody waits on it.
+**Expect about 8 to 12 minutes per pull or merge request.** Measured on free GitHub and GitLab runners in October 2026 on the lab change below: about 1 minute to install Ollama, about 6 minutes for the review itself (the runner has no GPU, so the model runs on CPU), and seconds to post. Because the check never blocks the merge, nobody waits on it.
 
 Pick GitHub or GitLab. You do not need both.
 
@@ -53,11 +53,16 @@ Nothing else to set up. The workflow uses the built-in `GITHUB_TOKEN`.
 ## GitLab CI/CD
 
 1. Create the token the bot comments with. GitLab's built-in job token cannot comment on merge requests, and on the free tier of GitLab.com you cannot create a project access token, so the bot uses a personal access token.
-   - **Your avatar > Edit profile > Access tokens > Add new token.** Name it `review-bot`, scope **api**, and set the expiry to the day after the workshop.
+   - **Your avatar > Edit profile > Access tokens > Add new token.** Choose **fine-grained** permissions, not the legacy scopes. Name it `review-bot` and set the expiry to the day after the workshop.
+   - Select exactly three permissions, and nothing for the repository:
+     - `read_work_item`: the bot looks for its own earlier comment
+     - `create_work_item`: the bot posts its first comment
+     - `update_work_item`: the bot edits that comment on later pushes
+   - If the form lets you limit the token to one project, pick this project.
    - Copy the token. GitLab shows it only once.
-   - In your project: **Settings > CI/CD > Variables > Add variable.** Key `REVIEW_BOT_TOKEN`, paste the token, set visibility to **Masked**.
+   - In your project: **Settings > CI/CD > Variables > Add variable.** Key `REVIEW_BOT_TOKEN`, paste the token, set visibility to **Masked**, and leave **Protect variable** unticked (merge request branches are not protected, so a protected variable would not reach the job).
 
-   A personal access token with scope api can act as you on every project you can reach, which is far more than the bot needs. That is the honest cost of the free tier, and it is one of the Module 6 hardening discussions. Use a short expiry, and consider a separate GitLab account just for the workshop. On Premium or Ultimate, use a project access token instead (**Settings > Access tokens**, role **Reporter**, scope **api**), which is limited to the one project.
+   Merge request comments sit under GitLab's "work item" permissions, which also cover issues and epics. That is as narrow as GitLab goes, and it is a Module 6 discussion. The job checks out code with GitLab's own job token, so the bot token needs no repository access at all. If your form only offers legacy scopes, use scope **api** with a short expiry; it is far broader. On Premium or Ultimate, a project access token (role **Reporter**, scope **api**) also works.
 2. Copy the pipeline into place on `main` and push it:
 
    ```bash
@@ -106,6 +111,6 @@ Do not read the patch before the bot has reviewed it. Compare the bot's comment 
 ## If something goes wrong
 
 - **No comment appears, GitHub.** Open the job log. If it says the token lacks permission, check that the workflow file still has `pull-requests: write` under `permissions`.
-- **No comment appears, GitLab.** The job log names the problem. Most often `REVIEW_BOT_TOKEN` is missing, has expired, or lacks the api scope.
+- **No comment appears, GitLab.** The job log names the problem. Most often `REVIEW_BOT_TOKEN` is missing, has expired, is marked protected, or lacks one of the three work item permissions. Without `read_work_item` the bot cannot find its earlier comment and posts nothing.
 - **The job runs out of time or memory.** Use the smaller model: set `REVIEW_MODEL` to `qwen2.5-coder:7b` and `REVIEW_THINK` to `false` (GitHub: repository variables; GitLab: CI/CD variables).
 - **The comment says no findings.** The diff contained no Python files, or the scanners found nothing on the changed lines. The comment says which.

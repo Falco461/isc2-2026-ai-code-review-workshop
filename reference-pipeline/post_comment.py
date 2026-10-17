@@ -12,10 +12,11 @@ GitHub Actions: uses GITHUB_TOKEN, which the workflow grants with
 `permissions: pull-requests: write`. Nothing to create.
 
 GitLab CI: the built-in CI_JOB_TOKEN cannot comment on merge requests.
-Store a token as a masked CI/CD variable named REVIEW_BOT_TOKEN. On
-GitLab.com Free that is a personal access token with scope api, because
-project access tokens need Premium or Ultimate there. On a paid tier,
-prefer a project access token (role Reporter, scope api).
+Store a token as a masked CI/CD variable named REVIEW_BOT_TOKEN: a
+fine-grained personal access token with read_work_item (find the earlier
+comment), create_work_item (post it) and update_work_item (edit it), and
+no repository permissions. Project access tokens need Premium or Ultimate
+on GitLab.com.
 
 The bot never fails the pipeline. If posting goes wrong it prints a
 warning and exits 0, unless you pass --strict.
@@ -150,9 +151,9 @@ def gitlab_target():
     iid = os.environ.get("CI_MERGE_REQUEST_IID")
     if not token:
         return None, (
-            "REVIEW_BOT_TOKEN is not set. Create a personal access token with "
-            "scope api (or, on Premium or Ultimate, a project access token with "
-            "role Reporter and scope api) and add it as a masked CI/CD variable."
+            "REVIEW_BOT_TOKEN is not set. Create a fine-grained personal access "
+            "token with read_work_item, create_work_item and update_work_item, "
+            "and add it as a masked CI/CD variable. See ci-templates/README.md."
         )
     if not (api and project and iid):
         return None, "this pipeline is not for a merge request, so there is nowhere to comment."
