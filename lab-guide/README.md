@@ -20,8 +20,9 @@ Step-by-step instructions for every lab. Work through them in order. Each one sa
 | Time | Module | Guide |
 |---|---|---|
 | 8:15 | 5. Attacking Your Own Bot | [05-attacking-your-bot.md](05-attacking-your-bot.md) |
+| 10:15 | 6. Defenses and Enterprise Hardening | [06-defenses.md](06-defenses.md) |
 
-Modules 6 to 8 are added before the workshop.
+Modules 7 and 8 are added before the workshop.
 
 ## Where you are working
 
