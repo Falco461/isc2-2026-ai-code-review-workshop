@@ -4,6 +4,7 @@
 #   OLLAMA_HOST   overrides host
 #   REVIEW_MODEL  overrides model
 #   REVIEW_THINK  overrides think
+#   REVIEW_SANITIZE  overrides sanitize_source (1 or 0)
 
 [model]
 # Default is qwen3.5:9b with reasoning off. In the October 2026 bake-off it
@@ -38,6 +39,12 @@ max_findings = 25
 #   B403  importing pickle, same reason; B301 flags the unsafe call itself
 #   B101  assert used, which is how pytest is written
 ignored_rules = ["B404", "B403", "B101"]
+
+# Module 6 input sanitization. When true, comments, docstrings, and bare
+# string statements are replaced with a placeholder before the model sees
+# a Python file. Line numbers do not move. Off on Day 1 so Module 5 can
+# attack the unhardened bot; Module 6 turns it on.
+sanitize_source = false
 
 # Paths never handed to the scanners.
 excluded_paths = [".venv", ".git", ".pytest_cache", "__pycache__", "node_modules"]

@@ -12,11 +12,14 @@ Exit code is always 0 in this phase. Blocking behavior is a later module.
 """
 
 import argparse
+import ast
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import tokenize
 import tomllib
 from pathlib import Path
 from typing import NoReturn
@@ -125,6 +128,8 @@ def load_config(path=CONFIG_PATH):
     review.setdefault("max_findings", 25)
     review.setdefault("ignored_rules", [])
     review.setdefault("excluded_paths", [])
+    sanitize = os.environ.get("REVIEW_SANITIZE", review.get("sanitize_source", False))
+    review["sanitize_source"] = str(sanitize).strip().lower() in ("1", "true", "on", "yes")
     return config
 
 
@@ -384,14 +389,63 @@ def build_triage_user(scanner, source):
     )
 
 
-def numbered_source(path):
+COMMENT_PLACEHOLDER = "# [comment removed by the review bot]"
+DOCSTRING_PLACEHOLDER = '"""[docstring removed by the review bot]"""'
+
+
+def sanitize_python(text):
+    """Remove comments and docstrings, keeping every line where it was.
+
+    Module 6 input sanitization. Comments, docstrings, and bare string
+    statements are written by the author of the code under review, and the
+    model treats them as evidence: a docstring that calls a file test
+    fixtures talked the model out of two real secrets in Module 5. Code
+    lines are untouched and the line count never changes, so citations
+    still point at the real file. If the file does not parse, it is
+    returned unchanged with a warning.
+    """
+    lines = text.split("\n")
+    try:
+        tree = ast.parse(text)
+        tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (SyntaxError, tokenize.TokenError, ValueError):
+        warn("could not parse the file for sanitizing, sending it unchanged.")
+        return text
+
+    # Bare string statements: docstrings, and dead strings anywhere.
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            first, last = node.lineno - 1, (node.end_lineno or node.lineno) - 1
+            indent = lines[first][: len(lines[first]) - len(lines[first].lstrip())]
+            lines[first] = indent + DOCSTRING_PLACEHOLDER
+            for index in range(first + 1, last + 1):
+                lines[index] = ""
+
+    # Comments, including the ones after code on the same line.
+    for token in reversed(tokens):
+        if token.type == tokenize.COMMENT:
+            row, col = token.start
+            line = lines[row - 1]
+            if line[col:].startswith("#"):
+                lines[row - 1] = line[:col] + COMMENT_PLACEHOLDER
+
+    return "\n".join(lines)
+
+
+def numbered_source(path, sanitize=False):
     """Read a file with 1-based line numbers prefixed."""
     try:
-        lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         warn("could not read %s: %s" % (path, exc))
         return None
-    return "\n".join("%d: %s" % (i, line) for i, line in enumerate(lines, 1))
+    if sanitize and str(path).endswith(".py"):
+        text = sanitize_python(text)
+    return "\n".join("%d: %s" % (i, line) for i, line in enumerate(text.splitlines(), 1))
 
 
 def call_model(config, system, user, schema):
@@ -524,7 +578,7 @@ def triage_findings(config, prompts, scanner_findings, dry_run):
     rendered = []
 
     for scanner in scanner_findings:
-        source = numbered_source(REPO_ROOT / scanner["file"])
+        source = numbered_source(REPO_ROOT / scanner["file"], config["review"]["sanitize_source"])
         if source is None:
             continue
         total_lines = source.count("\n") + 1
@@ -549,7 +603,7 @@ def triage_findings(config, prompts, scanner_findings, dry_run):
 
 def sweep_file(config, prompts, file_path, known, dry_run):
     """Freeform review of one file, the secondary path."""
-    source = numbered_source(REPO_ROOT / file_path)
+    source = numbered_source(REPO_ROOT / file_path, config["review"]["sanitize_source"])
     if source is None:
         return [], []
     total_lines = source.count("\n") + 1
