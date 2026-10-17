@@ -113,6 +113,11 @@ def test_evidence_from_another_file_is_dropped():
     assert validate({"evidence": quote}) is None
 
 
+def test_evidence_with_copied_line_numbers_still_matches():
+    """Models copy the '59: ' prefix from the numbered source they were shown."""
+    assert validate({"evidence": "59: " + GOOD["evidence"]}) is not None
+
+
 def test_evidence_matches_despite_whitespace():
     spaced = "sql   =   " + GOOD["evidence"][len("sql = "):]
     assert validate({"evidence": spaced}) is not None

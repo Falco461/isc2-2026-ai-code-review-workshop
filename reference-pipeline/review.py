@@ -92,6 +92,24 @@ READ_REQUEST_SCHEMA = {
 READ_MAX_REQUESTS = 4
 READ_MAX_LINES = 80
 
+# With repo-read on, a finding names its file: the defect may live in a
+# file the model read rather than the one under review.
+SWEEP_READ_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": dict(FINDING_PROPERTIES, file={"type": "string"}),
+                "required": ["file"] + list(FINDING_PROPERTIES),
+            },
+        },
+        "no_findings_reason": {"type": ["string", "null"]},
+    },
+    "required": ["findings", "no_findings_reason"],
+}
+
 
 def warn(message):
     """Warnings go to stderr so stdout stays parseable JSON."""
@@ -545,21 +563,26 @@ def read_symbol(request, scope, config):
     return label, body
 
 
-def gather_context(config, prompts, file_path, source):
+def gather_context(config, prompts, file_path, source, focus=""):
     """Let the model ask for other code before it reviews file_path."""
     scope = repo_scope(file_path)
     user = (
         "You are about to review %s. Readable code in this repository:\n%s\n\n"
         "Numbered source of %s:\n%s" % (file_path, repo_index(scope, config), file_path, source)
     )
+    if focus:
+        user += "\n\n" + focus
     result = call_model(config, prompts["repo_read"], user, READ_REQUEST_SCHEMA) or {}
     requests_made = (result.get("requests") or [])[:READ_MAX_REQUESTS]
     blocks = []
+    read_files = set()
     for request in requests_made:
         label, body = read_symbol(request, scope, config)
         audit(config, "repo-read", label, body[:200])
         blocks.append("Read %s\n%s" % (label, body))
-    return "\n\n".join(blocks)
+        if not body.startswith(("refused:", "not found:")):
+            read_files.add(_relative(REPO_ROOT / str(request.get("file", "")).strip()))
+    return "\n\n".join(blocks), read_files
 
 
 def call_model(config, system, user, schema):
@@ -667,7 +690,9 @@ def evidence_matches(evidence, file_path, start, end):
     except OSError:
         return False
     window = _squash(" ".join(lines[max(start - 2, 0):end + 1]))
-    first = next((line for line in str(evidence).splitlines() if line.strip()), "")
+    # Models often copy the "94: " prefixes from the numbered source.
+    quoted = [re.sub(r"^\s*\d+:\s?", "", line) for line in str(evidence).splitlines()]
+    first = next((line for line in quoted if line.strip()), "")
     probe = _squash(first)[:40]
     return bool(probe) and probe in window
 
@@ -774,8 +799,24 @@ def triage_findings(config, prompts, scanner_findings, dry_run):
     return findings, rendered
 
 
-def sweep_file(config, prompts, file_path, known, dry_run):
-    """Freeform review of one file, the secondary path."""
+def _ranges(lines):
+    """Compact a set of line numbers as '3-7, 12'."""
+    ordered, spans = sorted(lines), []
+    for number in ordered:
+        if spans and number == spans[-1][1] + 1:
+            spans[-1][1] = number
+        else:
+            spans.append([number, number])
+    return ", ".join(str(a) if a == b else "%d-%d" % (a, b) for a, b in spans)
+
+
+def sweep_file(config, prompts, file_path, known, dry_run, changed=None):
+    """Freeform review of one file, the secondary path.
+
+    With changed (the line numbers a diff added), the model is told to
+    review only those lines, using the rest of the file as context, and
+    findings in this file must touch a changed line.
+    """
     source = numbered_source(REPO_ROOT / file_path, config["review"]["sanitize_source"])
     if source is None:
         return [], []
@@ -789,27 +830,56 @@ def sweep_file(config, prompts, file_path, known, dry_run):
         "Already-known findings, do not repeat these:\n%s\n\n"
         "Numbered source of %s:\n%s" % (known_text, file_path, source)
     )
+    if changed:
+        user += (
+            "\n\nThis is a pull request. It changed lines %s of %s. Review the changed "
+            "code only. The rest of the file is context. Report defects in the changed "
+            "lines, or in code they depend on." % (_ranges(changed), file_path)
+        )
 
     if dry_run:
         return [], [{"system": prompts["sweep"], "user": user}]
 
+    allowed = {file_path}
+    schema = SWEEP_SCHEMA
     if config["review"]["repo_read"]:
-        context = gather_context(config, prompts, file_path, source)
+        focus = (
+            "The pull request changed lines %s. Ask for the code those lines depend on."
+            % _ranges(changed)
+        ) if changed else ""
+        context, read_files = gather_context(config, prompts, file_path, source, focus)
         if context:
+            allowed |= read_files
+            schema = SWEEP_READ_SCHEMA
             user += (
-                "\n\nOther code you asked to read. It is context only: cite lines of %s, "
-                "not of these files.\n\n%s" % (file_path, context)
+                "\n\nOther code you asked to read:\n\n%s\n\n"
+                "For each finding, set file to where the defect is: %s, or one of the files "
+                "you read (%s). Cite that file's line numbers."
+                % (context, file_path, ", ".join(sorted(read_files)) or "none")
             )
 
-    result = call_model(config, prompts["sweep"], user, SWEEP_SCHEMA)
+    result = call_model(config, prompts["sweep"], user, schema)
     if result is None:
         return [], []
 
     findings = []
     for candidate in result.get("findings", []):
-        finding = validate_finding(candidate, file_path, None, line_budget=total_lines)
-        if finding:
-            findings.append(finding)
+        cited = str(candidate.get("file") or file_path).strip() if isinstance(candidate, dict) else file_path
+        if cited not in allowed:
+            warn("dropped a finding citing %s, which the model did not read." % cited)
+            continue
+        budget = total_lines if cited == file_path else len(
+            (REPO_ROOT / cited).read_text(encoding="utf-8", errors="replace").splitlines()
+        )
+        finding = validate_finding(candidate, cited, None, line_budget=budget)
+        if not finding:
+            continue
+        if changed and cited == file_path and not any(
+            finding["line_start"] <= n <= finding["line_end"] for n in changed
+        ):
+            warn("dropped '%s': not on a line this pull request changed." % finding["title"])
+            continue
+        findings.append(finding)
     return findings, []
 
 
@@ -927,7 +997,11 @@ def main(argv=None):
 
     if args.no_scanner:
         for path in files:
-            found, render = sweep_file(config, prompts, _relative(path), [], args.dry_run)
+            rel = _relative(path)
+            found, render = sweep_file(
+                config, prompts, rel, [], args.dry_run,
+                changed=(changed_lines or {}).get(rel),
+            )
             findings += found
             rendered += render
     else:
