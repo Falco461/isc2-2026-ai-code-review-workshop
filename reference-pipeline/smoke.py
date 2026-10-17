@@ -130,18 +130,26 @@ def check_schema(document):
 
 
 def check_required_bugs(document):
-    """The three reachable planted bugs are all reported."""
-    located = {(f["file"], f["line_start"]) for f in document["findings"]}
+    """The three reachable planted bugs are all reported.
+
+    A finding counts when its cited range covers the bug's line. Models
+    cite a whole statement, so a multi-line subprocess.run call can start
+    a line or two above the line Bandit flags.
+    """
     missed = []
     for label, path, line in REQUIRED_BUGS:
-        if (path, line) not in located:
+        covered = any(
+            f["file"] == path and f["line_start"] <= line <= f["line_end"]
+            for f in document["findings"]
+        )
+        if not covered:
             missed.append("%s (expected %s:%d)" % (label, path, line))
 
     if missed:
         raise SmokeFailure(
             "the review did not report:\n  %s\n"
-            "Check that the model in config.toml is qwen2.5-coder:7b. The 3b "
-            "model cannot find these and will fail this check." % "\n  ".join(missed)
+            "Check that the model in config.toml is qwen3.5:9b with think = false. "
+            "See docs/MODEL_EVAL.md for which models pass." % "\n  ".join(missed)
         )
 
 

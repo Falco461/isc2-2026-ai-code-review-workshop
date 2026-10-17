@@ -12,7 +12,8 @@ Audience level as published: Mid, 4 to 9 years. Track: Engineering/Architecture.
 
 - Security engineers who are comfortable in a terminal and have never run a local model.
 - Attendee laptops: mostly Windows 11 corporate machines, then macOS on Apple Silicon, some Linux. Baseline assumption: 16 GB RAM, no admin rights.
-- Test machines on hand: MacBook Pro M1 16 GB (macOS), Dell XPS 15 32 GB (Windows 11), Kubuntu desktop (Linux).
+- Presentation and demo machine: MacBook Pro M5 Max 48 GB (macOS), upgraded October 2026 for the talk and the workshop. It runs `gpt-oss:20b` live for Module 2.
+- Other test machines: Dell XPS 15 32 GB (Windows 11), Kubuntu desktop (Linux). The M5 Max is far faster than an attendee laptop, so time anything quoted to attendees on a 16 GB machine.
 
 ## Design decisions
 
@@ -31,20 +32,23 @@ Settled May 2026. Revised September 2026 only where measurement contradicted the
 - That means the Prerequisites section of `README.md` is not reconciling against a published list, it **is** the list. It is the only prerequisites document that exists, so whatever it says is what attendees will be told. Write it accordingly.
 - If a later module genuinely needs a container, for example sandboxing the bot in Module 6 or the scale-up architecture in Module 7, **use Podman, not Docker**. Rootless, no daemon, no licensing question on a work machine. Ask before it becomes a prerequisite rather than a demo.
 
-## Model tiers (measured September 2026, M1 16 GB)
+## Model tiers (measured October 2026)
 
-Measured on a Flask sample with five planted bugs, five reps, temperature 0, JSON-schema-constrained decoding. Numbers live in `docs/MODEL_EVAL.md`.
+Bake-off on the real pipeline against `target-app`, three reps per model, triage and cold review, temperature 0, JSON-schema-constrained decoding. Numbers live in `docs/MODEL_EVAL.md`. Measured on an M5 Max; time the default on a 16 GB machine before quoting laptop speeds.
 
-- **Default is `qwen2.5-coder:7b`.** It is the only model tested that meets the definition of done. Cold discovery with scanner evidence supplied: SQL injection 5/5, hardcoded secret 5/5, command injection 5/5. About 60 seconds per full review on the M1.
-- **`qwen2.5-coder:3b` is the triage tier, and on the triage path it is not a downgrade.** It is 100 percent reliable at explaining and prioritizing a scanner finding (20/20 calls, correct line preserved every time), matching the 7B exactly while running twice as fast, 30 seconds against 65 for the same four-finding review. Because scanner output is the primary input, a 3B attendee gives up nothing in Modules 3 and 4. It cannot discover vulnerabilities cold: 0/5 on both the SQL injection and the hardcoded secret in every configuration tested, including the q8 quant and a decomposed one-call-per-finding architecture. It is not viable for the capstone.
-- **Do not use `qwen3:4b` or any reasoning model.** Thinking tokens make a single review take minutes and fight the schema constraint.
-- The 3B versus 7B split is content, not just configuration. The same finding through both models is the Module 2 "what it catches, misses, and hallucinates" lab and the Module 1 model-size discussion.
+- **Default is `qwen3.5:9b` with `think = false`.** It escalated every scanner-reachable planted bug in triage (SQL injection, both hardcoded secrets, command injection) and found the same four cold. 6.6 GB, fits 16 GB.
+- **`gpt-oss:20b` with `think = "low"` is the Module 2 model**, because the published description names GPT-OSS. It cannot turn reasoning off, so it needs a level. It was the only model that found path traversal cold, with the fewest and most precise findings. 13 GB, needs about 24 GB RAM.
+- **`qwen2.5-coder:7b` is the low-memory fallback.** It rates the hardcoded reporting token in `app.py` as info in every triage run, a real false negative.
+- **`qwen2.5-coder:3b` is no longer a triage tier.** On the current prompt it drops the hardcoded secret key and escalates a known false positive. Do not recommend it.
+- **Reasoning models only with reasoning set explicitly.** `think` in `config.toml` (or `REVIEW_THINK`) is always set. A reasoning model left on its default, like `qwen3:4b` in September, takes minutes per review.
+- Every newer model escalates the `auth.py` false positive that the 7B dismisses. That is prompt work, and the before and after numbers are Module 3 content.
+- Cisco Foundation-Sec 8B (security-trained) found the reachable bugs cold but at 19 to 20 findings per run, and dropped the secret key in triage. Security training is not code reading; useful Module 1 discussion, not a default.
 
 Hardware honesty for the prerequisites, which go to ISC2 verbatim: 16 GB RAM minimum, no 8 GB machines, GPU or Apple Silicon recommended, model pre-pulled before travel. A CPU-only Windows laptop produces a few tokens per second, so state plainly that a review takes a minute or two there.
 
-**There is no instructor-hosted fallback server.** The available hardware is one M1 MacBook Pro, which is the presentation machine, and one Dell XPS 15 whose 3050 Ti has 4 GB of VRAM and cannot hold a 7B. Neither can serve a room over conference wifi. The attendee-facing docs must not promise one.
+**There is no instructor-hosted fallback server.** The M5 Max is the presentation machine and is busy presenting, and no laptop can serve a room over conference wifi. The attendee-facing docs must not promise one.
 
-The fallback story is the 3B tier plus pairing. That is a genuinely good answer rather than a climbdown: the 3B is 1.9 GB, matches the 7B exactly on the scanner-triage path that Modules 3 and 4 run on, and does it twice as fast. `OLLAMA_HOST` stays documented as a mechanism for anyone who has another machine, and is described as a mechanism, never as something provided in the room.
+The fallback story is `qwen2.5-coder:7b` (4.7 GB, no reasoning mode) plus pairing. The 3B tier is retired: on the current prompt it drops a real secret in triage. `OLLAMA_HOST` stays documented as a mechanism for anyone who has another machine, and is described as a mechanism, never as something provided in the room.
 
 ## Standing rules
 
@@ -60,7 +64,7 @@ The fallback story is the 3B tier plus pairing. That is a genuinely good answer 
 - LLM access is Ollama's HTTP API called directly with requests. Base URL from `OLLAMA_HOST` (default `http://127.0.0.1:11434`). Model name from `config.toml`, overridable by `REVIEW_MODEL`. Changing the default stays a one-line change.
 - Structured output: pass a full JSON schema to Ollama's `format` field, not the string `"json"`. Schema-constrained decoding produced valid output on every run of every model tested, where asking for JSON in the prompt produced malformed arrays and wrong enum casing. Validate in code anyway, and drop anything that fails validation with a logged warning.
 - No em dashes anywhere: docs, comments, strings, commit messages. Use commas, colons, or parentheses instead.
-- Attendee voice in all docs: short sentences, every command shown for bash and PowerShell, every error message names the fix.
+- Attendee voice in all docs: short sentences, every command shown for bash (macOS, Linux, and Codespaces; there is no native Windows path), every error message names the fix.
 - Git: one commit per deliverable, descriptive messages, no force push, never modify LICENSE. Run the smoke test before any commit that touches code.
 
 ## Phase order
@@ -74,3 +78,5 @@ Promised in the submission and therefore Phase 2 work, not optional extras:
 - Practice repositories with planted bugs that attendees push to their own GitHub or GitLab account, so they see findings land in the PR or MR interface rather than only in a terminal.
 - A hardening checklist deliverable.
 - A TCO model for self-hosted versus commercial, which is the third published takeaway.
+
+Phase 2 status, October 17, 2026: all of the above is built and tested, plus the Module 5 attack lab, Module 6 defenses (sanitizing, audit log, evidence check), the Module 8 repo-read tool and capstone, the Module 7 architecture page and TCO workbook, Codespaces, and lab guides 00 to 08. Branch `phase2/model-update` merges to main on October 21. The TCO workbook is built by a script kept in the project folder, not this repository.

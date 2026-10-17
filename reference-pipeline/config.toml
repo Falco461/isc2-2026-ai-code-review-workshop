@@ -3,15 +3,29 @@
 # Environment variables win over anything set here:
 #   OLLAMA_HOST   overrides host
 #   REVIEW_MODEL  overrides model
+#   REVIEW_THINK  overrides think
+#   REVIEW_SANITIZE  overrides sanitize_source (1 or 0)
+#   REVIEW_AUDIT_LOG overrides audit_log (a file path)
+#   REVIEW_REPO_READ overrides repo_read (1 or 0)
 
 [model]
-# Default is the 7B. It is the only model measured that finds bugs cold,
-# which the capstone needs. See docs/MODEL_EVAL.md.
+# Default is qwen3.5:9b with reasoning off. In the October 2026 bake-off it
+# escalated every scanner-reachable planted bug in both triage and cold
+# review, and it fits a 16 GB laptop (6.6 GB). See docs/MODEL_EVAL.md.
 #
-# On a CPU-only or memory-constrained laptop, switch to
-# "qwen2.5-coder:3b". It triages scanner findings just as accurately and
-# about twice as fast. It cannot discover bugs cold.
-name = "qwen2.5-coder:7b"
+# think controls reasoning. Keep it set explicitly, because a reasoning
+# model left on its default spends minutes thinking before it answers.
+#   false              reasoning off. Safe on every model.
+#   "low" to "high"    only for models that cannot turn reasoning off.
+#
+# Other models, switch both lines together:
+#   gpt-oss:20b        think = "low"   The Module 2 model. Needs 24 GB+ RAM.
+#   qwen2.5-coder:7b   think = false   Previous default, 4.7 GB. Misses a
+#                                      hardcoded token in triage.
+#
+# REVIEW_MODEL and REVIEW_THINK override these two lines.
+name = "qwen3.5:9b"
+think = false
 host = "http://127.0.0.1:11434"
 timeout_seconds = 300
 temperature = 0
@@ -24,8 +38,29 @@ max_findings = 25
 # Scanner rules that are advisory rather than defects, dropped before the
 # model ever sees them. Triaging these wastes a model call each.
 #   B404  importing subprocess, which is not a bug on its own
+#   B403  importing pickle, same reason; B301 flags the unsafe call itself
 #   B101  assert used, which is how pytest is written
-ignored_rules = ["B404", "B101"]
+ignored_rules = ["B404", "B403", "B101"]
+
+# Module 6 input sanitization. When true, comments, docstrings, and bare
+# string statements are replaced with a placeholder before the model sees
+# a Python file. Line numbers do not move. Off on Day 1 so Module 5 can
+# attack the unhardened bot; Module 6 turns it on.
+sanitize_source = false
+
+# Module 6 audit logging. A file path turns it on: one JSON line per model
+# call with the model, a sha256 of the exact prompt, the prompt, and the
+# raw answer. Empty means off. REVIEW_AUDIT_LOG overrides. The log holds
+# source code from the review, so treat it like the code.
+audit_log = ""
+
+# Module 8 repo-read tool. With --no-scanner, lets the model read up to
+# four named functions or classes elsewhere in the reviewed file's folder
+# before it reviews. Read-only, Python only, never test files, audited.
+# Off by default because it gives the model a choice of what to read,
+# which Module 8 shows an attacker can steer. --repo-read or
+# REVIEW_REPO_READ turns it on.
+repo_read = false
 
 # Paths never handed to the scanners.
 excluded_paths = [".venv", ".git", ".pytest_cache", "__pycache__", "node_modules"]

@@ -8,6 +8,7 @@ been fixed and PLANTED.md is out of date.
 from flask.sessions import SecureCookieSessionInterface
 
 import app as app_module
+import models
 import storage
 from conftest import login
 
@@ -91,3 +92,21 @@ def test_bug_5_path_traversal_escapes_the_upload_directory(client):
 
     assert response.status_code == 200
     assert b"INTERNAL ONLY" in response.data
+
+
+def test_bug_6_one_hardcoded_password_logs_in_as_every_user(client):
+    """Hardcoded universal password in verify_password.
+
+    The stored hash for each user is a template built from the username,
+    so it holds nothing secret, and the real check is a literal compared in
+    source. Anyone who can read the repository can log in as any user.
+    """
+    for username in ("alice", "bob"):
+        user = models.get_user_by_username(username)
+        assert user["password_hash"] == "pbkdf2$demo$%s-not-a-real-hash" % username
+
+        response = login(client, username, "password123")
+
+        assert response.status_code == 200
+        assert response.get_json()["user_id"] == user["id"]
+        client.post("/api/logout")

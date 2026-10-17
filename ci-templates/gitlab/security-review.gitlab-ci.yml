@@ -1,0 +1,56 @@
+# Security review bot for GitLab CI/CD, free tier.
+#
+# Copy this file to .gitlab-ci.yml in your repository, or include it from
+# your existing one. It runs on every merge request, reviews only the lines
+# the merge request changes, and posts one comment that it edits on later
+# pushes.
+#
+# One setup step: GitLab's built-in job token cannot comment on merge
+# requests, and on GitLab.com Free you cannot create a project access
+# token. Create a fine-grained personal access token with exactly
+# read_work_item, create_work_item and update_work_item (no repository
+# permissions), expiring right after the workshop, and add it as a masked,
+# unprotected CI/CD variable named REVIEW_BOT_TOKEN (Settings > CI/CD >
+# Variables). See ci-templates/README.md.
+#
+# Advisory only: the job never fails the pipeline.
+# The model runs inside the runner. No cloud model.
+
+security-review:
+  stage: test
+  image: python:3.12-slim-bookworm
+  # The default qwen3.5:9b needs about 16 GB of memory. The small shared
+  # runner has 8 GB, so this asks for the medium runner, which uses your
+  # free compute minutes faster. Without the tag, set REVIEW_MODEL to
+  # qwen2.5-coder:7b and REVIEW_THINK to false.
+  tags:
+    - saas-linux-medium-amd64
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: true
+  timeout: 45m
+  variables:
+    REVIEW_MODEL: "qwen3.5:9b"
+    REVIEW_THINK: "false"
+    OLLAMA_HOST: "http://127.0.0.1:11434"
+    OLLAMA_MODELS: "$CI_PROJECT_DIR/.ollama-models"
+    GIT_DEPTH: "0"
+  cache:
+    key: "ollama-$REVIEW_MODEL"
+    paths:
+      - .ollama-models
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends curl ca-certificates git zstd >/dev/null
+    - curl -fsSL https://ollama.com/install.sh | sh
+    - nohup ollama serve > ollama.log 2>&1 &
+    - for i in $(seq 1 30); do curl -fs "$OLLAMA_HOST/api/version" >/dev/null && break; sleep 1; done
+    - ollama pull "$REVIEW_MODEL"
+    - python -m venv .venv
+    - .venv/bin/python -m pip install --quiet -r reference-pipeline/requirements.txt
+  script:
+    - git fetch --quiet origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" > mr.diff
+    - .venv/bin/python reference-pipeline/review.py --diff mr.diff > findings.json
+    - cat findings.json
+  after_script:
+    - .venv/bin/python reference-pipeline/post_comment.py findings.json

@@ -103,8 +103,24 @@ def test_multiple_scanner_references_are_joined():
 
 
 def test_long_evidence_is_truncated():
-    result = validate({"evidence": "x" * 2000})
+    result = validate({"evidence": GOOD["evidence"] + "x" * 2000})
     assert len(result["evidence"]) == 500
+
+
+def test_evidence_from_another_file_is_dropped():
+    """The model read auth.py but filed its quote under models.py."""
+    quote = 'if password == "password123":'
+    assert validate({"evidence": quote}) is None
+
+
+def test_evidence_with_copied_line_numbers_still_matches():
+    """Models copy the '59: ' prefix from the numbered source they were shown."""
+    assert validate({"evidence": "59: " + GOOD["evidence"]}) is not None
+
+
+def test_evidence_matches_despite_whitespace():
+    spaced = "sql   =   " + GOOD["evidence"][len("sql = "):]
+    assert validate({"evidence": spaced}) is not None
 
 
 def test_every_schema_key_is_present_on_a_validated_finding():

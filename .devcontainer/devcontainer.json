@@ -1,0 +1,33 @@
+{
+  // GitHub Codespaces setup for the workshop.
+  // Same Linux machine for every attendee, nothing installed on the laptop.
+  // Creation installs Ollama, pulls the default model, and builds .venv
+  // with the pinned requirements. Every start launches Ollama.
+  "name": "Security bot workshop",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  // sshd lets `gh codespace ssh` and VS Code desktop connect. Browser use does not need it.
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  },
+  "containerEnv": {
+    "OLLAMA_HOST": "http://127.0.0.1:11434"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+        "python.terminal.activateEnvironment": true
+      }
+    }
+  }
+}

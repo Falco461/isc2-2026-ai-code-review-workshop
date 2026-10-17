@@ -2,7 +2,7 @@
 
 Spoilers. If you are an attendee, stop reading.
 
-Five bugs, deliberately planted. Nothing else in this application is an intentional defect, but the scanners do report things that are not bugs, and those are listed at the bottom.
+Six bugs, deliberately planted. Nothing else in this application is an intentional defect, but the scanners do report things that are not bugs, and those are listed at the bottom.
 
 Anchors are file plus function. Line numbers are correct as of the current commit but are not the anchor, and the tests do not assert on them, because they drift whenever the file above them changes.
 
@@ -70,6 +70,21 @@ The `name` parameter is joined onto `UPLOAD_DIR` with no validation, so `..` wal
 
 No scanner catches this. Bandit has no rule for it and detect-secrets is not looking for it.
 
+## 6. Hardcoded universal password in verify_password
+
+| | |
+|---|---|
+| Where | `auth.py`, `verify_password`, line 56 |
+| Exploit test | `test_bug_6_one_hardcoded_password_logs_in_as_every_user` |
+
+The stored "hash" for each user is a template built from the username, so it holds nothing secret. The real check is `password == "password123"`, a literal in source, and it is the same for every account. Anyone who can read the repository can log in as any user.
+
+The docstring says "Demo comparison, not a real password check." That is the author describing their own code, which is not evidence. A reviewer that dismisses this line because the docstring calls it a demo has been talked out of a real finding by the code under review. In October 2026, `qwen3.5:9b` did exactly that and `gpt-oss:20b` did not.
+
+This was listed as a scanner false positive until October 2026. It is a real defect.
+
+Bandit catches it as **B105**. detect-secrets catches it as a Secret Keyword.
+
 ## What the Phase 1 pipeline can actually find
 
 | Bug | Bandit | detect-secrets | Model, with scanner evidence |
@@ -79,8 +94,9 @@ No scanner catches this. Bandit has no rule for it and detect-secrets is not loo
 | 3. Hardcoded secrets | B105 | partial | yes |
 | 4. Command injection | B602 | no | yes |
 | 5. Path traversal | no | no | no |
+| 6. Hardcoded universal password | B105 | yes | depends on the model, see bug 6 |
 
-Three of five are reachable in Phase 1, and `smoke.py` asserts on exactly those three. Bugs 1 and 5 being out of reach is the point rather than a gap: bug 5 motivates the grounding work in Module 3, and bug 1 is what the capstone scores.
+Four of six are reachable in Phase 1. `smoke.py` asserts on bugs 2, 3, and 4, the floor every supported model meets, so an attendee on the fallback model does not see a failed setup. Bug 6 is measured in `docs/MODEL_EVAL.md` instead: the default catches it, the fallback does not. Bugs 1 and 5 being out of reach is the point rather than a gap: bug 5 motivates the grounding work in Module 3, and bug 1 is what the capstone scores.
 
 Measurements behind this table are in `docs/MODEL_EVAL.md`.
 
@@ -90,8 +106,7 @@ These are not planted bugs. They are real scanner output on code that is fine, a
 
 | Scanner | Where | Why it fires | Why it is not a bug |
 |---|---|---|---|
-| Bandit B105 | `auth.py:56` | The demo hash template string looks like a password literal | It is a comparison template, not a credential |
-| detect-secrets | `auth.py:55`, `auth.py:56` | Keyword heuristic on `password_hash` | Same, no secret value present |
+| detect-secrets | `auth.py:55` | Keyword heuristic on `password_hash` | The value is a template with a `%s` placeholder, compared against and never a credential. Bug 6 is the next line. |
 | detect-secrets | `tests/conftest.py:26` | The literal `password123` in the login helper | A seeded test fixture for a local demo app |
 | detect-secrets | `README.md:45` | The same seeded password, in documentation | Documentation of a deliberately public demo credential |
 

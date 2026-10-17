@@ -125,7 +125,7 @@ else
      Ask the instructor which model name the hosted server provides, then:
        export REVIEW_MODEL=<that name>"
     fi
-    printf 'Pull it now? It is about 4.7 GB. [y/N] '
+    printf 'Pull it now? qwen3.5:9b is about 6.6 GB. [y/N] '
     read -r REPLY || REPLY="n"
     case "$REPLY" in
         [yY]*)
@@ -138,7 +138,7 @@ else
         *)
             die "cannot run the smoke test without the model.
      Pull it when you are ready with:  ollama pull $MODEL
-     Or switch to the smaller model by setting:  export REVIEW_MODEL=qwen2.5-coder:3b"
+     Low on memory or disk? See \"If your laptop cannot run the model\" in README.md."
             ;;
     esac
 fi

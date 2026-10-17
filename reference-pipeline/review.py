@@ -12,12 +12,17 @@ Exit code is always 0 in this phase. Blocking behavior is a later module.
 """
 
 import argparse
+import ast
+import hashlib
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import tokenize
 import tomllib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import NoReturn
 
@@ -63,6 +68,48 @@ SWEEP_SCHEMA = {
     "required": ["findings", "no_findings_reason"],
 }
 
+# Module 8 repo-read tool. The model may ask to read named functions or
+# classes elsewhere in the repository before it reviews a file. Limits are
+# enforced here, not requested in the prompt.
+READ_REQUEST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requests": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string"},
+                    "symbol": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["file", "symbol", "reason"],
+            },
+        },
+    },
+    "required": ["requests"],
+}
+READ_MAX_REQUESTS = 4
+READ_MAX_LINES = 80
+
+# With repo-read on, a finding names its file: the defect may live in a
+# file the model read rather than the one under review.
+SWEEP_READ_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": dict(FINDING_PROPERTIES, file={"type": "string"}),
+                "required": ["file"] + list(FINDING_PROPERTIES),
+            },
+        },
+        "no_findings_reason": {"type": ["string", "null"]},
+    },
+    "required": ["findings", "no_findings_reason"],
+}
+
 
 def warn(message):
     """Warnings go to stderr so stdout stays parseable JSON."""
@@ -76,6 +123,30 @@ def fail(message) -> NoReturn:
 
 
 # ---------------------------------------------------------------- config
+
+THINK_LEVELS = ("low", "medium", "high")
+
+
+def parse_think(value):
+    """Normalize the think setting from config.toml or REVIEW_THINK.
+
+    false turns reasoning off and is safe on every model, including models
+    that have no reasoning mode. A level (low, medium, high) is for models
+    that cannot turn reasoning off, such as gpt-oss. None sends nothing.
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ("false", "off", "no", "0"):
+        return False
+    if text in ("true", "on", "yes", "1"):
+        return True
+    if text in THINK_LEVELS:
+        return text
+    fail(
+        "think must be false, true, low, medium, or high, not '%s'. "
+        "Fix model.think in config.toml or REVIEW_THINK." % value
+    )
 
 
 def load_config(path=CONFIG_PATH):
@@ -96,9 +167,16 @@ def load_config(path=CONFIG_PATH):
     if not model["host"]:
         fail("no host configured. Set model.host in config.toml or OLLAMA_HOST.")
 
+    model["think"] = parse_think(os.environ.get("REVIEW_THINK", model.get("think")))
+
     review.setdefault("max_findings", 25)
     review.setdefault("ignored_rules", [])
     review.setdefault("excluded_paths", [])
+    sanitize = os.environ.get("REVIEW_SANITIZE", review.get("sanitize_source", False))
+    review["sanitize_source"] = str(sanitize).strip().lower() in ("1", "true", "on", "yes")
+    review["audit_log"] = os.environ.get("REVIEW_AUDIT_LOG", review.get("audit_log", ""))
+    repo_read = os.environ.get("REVIEW_REPO_READ", review.get("repo_read", False))
+    review["repo_read"] = str(repo_read).strip().lower() in ("1", "true", "on", "yes")
     return config
 
 
@@ -358,14 +436,153 @@ def build_triage_user(scanner, source):
     )
 
 
-def numbered_source(path):
+COMMENT_PLACEHOLDER = "# [comment removed by the review bot]"
+DOCSTRING_PLACEHOLDER = '"""[docstring removed by the review bot]"""'
+
+
+def sanitize_python(text):
+    """Remove comments and docstrings, keeping every line where it was.
+
+    Module 6 input sanitization. Comments, docstrings, and bare string
+    statements are written by the author of the code under review, and the
+    model treats them as evidence: a docstring that calls a file test
+    fixtures talked the model out of two real secrets in Module 5. Code
+    lines are untouched and the line count never changes, so citations
+    still point at the real file. If the file does not parse, it is
+    returned unchanged with a warning.
+    """
+    lines = text.split("\n")
+    try:
+        tree = ast.parse(text)
+        tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (SyntaxError, tokenize.TokenError, ValueError):
+        warn("could not parse the file for sanitizing, sending it unchanged.")
+        return text
+
+    # Bare string statements: docstrings, and dead strings anywhere.
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            first, last = node.lineno - 1, (node.end_lineno or node.lineno) - 1
+            indent = lines[first][: len(lines[first]) - len(lines[first].lstrip())]
+            lines[first] = indent + DOCSTRING_PLACEHOLDER
+            for index in range(first + 1, last + 1):
+                lines[index] = ""
+
+    # Comments, including the ones after code on the same line.
+    for token in reversed(tokens):
+        if token.type == tokenize.COMMENT:
+            row, col = token.start
+            line = lines[row - 1]
+            if line[col:].startswith("#"):
+                lines[row - 1] = line[:col] + COMMENT_PLACEHOLDER
+
+    return "\n".join(lines)
+
+
+def numbered_source(path, sanitize=False):
     """Read a file with 1-based line numbers prefixed."""
     try:
-        lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         warn("could not read %s: %s" % (path, exc))
         return None
-    return "\n".join("%d: %s" % (i, line) for i, line in enumerate(lines, 1))
+    if sanitize and str(path).endswith(".py"):
+        text = sanitize_python(text)
+    return "\n".join("%d: %s" % (i, line) for i, line in enumerate(text.splitlines(), 1))
+
+
+# -------------------------------------------------------------- repo-read
+
+
+def repo_scope(file_path):
+    """The folder the repo-read tool may read: the reviewed file's top folder."""
+    parts = Path(file_path).parts
+    return (REPO_ROOT / parts[0]).resolve() if len(parts) > 1 else REPO_ROOT.resolve()
+
+
+def repo_index(scope, config):
+    """A menu of readable Python files and the functions and classes in each."""
+    excluded = set(config["review"]["excluded_paths"]) | {"tests"}
+    lines = []
+    for path in sorted(scope.rglob("*.py")):
+        if excluded.intersection(path.relative_to(scope).parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        names = [
+            n.name for n in tree.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        ]
+        lines.append("%s: %s" % (_relative(path), ", ".join(names) or "(no functions)"))
+    return "\n".join(lines)
+
+
+def read_symbol(request, scope, config):
+    """Return (label, numbered source) for one read request, or (label, refusal).
+
+    Read-only, confined to the scope folder, Python files only, never test
+    files, capped at READ_MAX_LINES lines. Sanitizing applies here too.
+    """
+    file_name = str(request.get("file", "")).strip()
+    symbol = str(request.get("symbol", "")).strip()
+    label = "%s: %s" % (file_name, symbol)
+    path = (REPO_ROOT / file_name).resolve()
+    if scope not in path.parents or path.suffix != ".py" or not path.is_file():
+        return label, "refused: only Python files inside %s can be read." % _relative(scope)
+    blocked = {"tests"} | set(config["review"]["excluded_paths"])
+    if blocked & set(path.relative_to(scope).parts):
+        return label, "refused: test and excluded files cannot be read."
+
+    text = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return label, "refused: the file does not parse."
+    node = next(
+        (
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name == symbol
+        ),
+        None,
+    )
+    if node is None:
+        return label, "not found: no function or class named %s in %s." % (symbol, file_name)
+
+    if config["review"]["sanitize_source"]:
+        text = sanitize_python(text)
+    source_lines = text.splitlines()
+    first = min([node.lineno] + [d.lineno for d in node.decorator_list])
+    last = min(node.end_lineno or node.lineno, first + READ_MAX_LINES - 1)
+    body = "\n".join("%d: %s" % (i, source_lines[i - 1]) for i in range(first, last + 1))
+    return label, body
+
+
+def gather_context(config, prompts, file_path, source, focus=""):
+    """Let the model ask for other code before it reviews file_path."""
+    scope = repo_scope(file_path)
+    user = (
+        "You are about to review %s. Readable code in this repository:\n%s\n\n"
+        "Numbered source of %s:\n%s" % (file_path, repo_index(scope, config), file_path, source)
+    )
+    if focus:
+        user += "\n\n" + focus
+    result = call_model(config, prompts["repo_read"], user, READ_REQUEST_SCHEMA) or {}
+    requests_made = (result.get("requests") or [])[:READ_MAX_REQUESTS]
+    blocks = []
+    read_files = set()
+    for request in requests_made:
+        label, body = read_symbol(request, scope, config)
+        audit(config, "repo-read", label, body[:200])
+        blocks.append("Read %s\n%s" % (label, body))
+        if not body.startswith(("refused:", "not found:")):
+            read_files.add(_relative(REPO_ROOT / str(request.get("file", "")).strip()))
+    return "\n\n".join(blocks), read_files
 
 
 def call_model(config, system, user, schema):
@@ -385,17 +602,19 @@ def call_model(config, system, user, schema):
             {"role": "user", "content": user},
         ],
     }
+    if model.get("think") is not None:
+        payload["think"] = model["think"]
     try:
         response = requests.post(url, json=payload, timeout=model.get("timeout_seconds", 300))
     except requests.exceptions.ConnectionError:
         fail(
-            "cannot reach Ollama at %s. Start it with 'ollama serve', or set "
-            "OLLAMA_HOST to the instructor-hosted model." % model["host"]
+            "cannot reach Ollama at %s. Start the Ollama app or run 'ollama serve', "
+            "or set OLLAMA_HOST to the machine running Ollama." % model["host"]
         )
     except requests.exceptions.Timeout:
         fail(
             "Ollama did not answer within %s seconds. Raise model.timeout_seconds "
-            "in config.toml, or switch model.name to qwen2.5-coder:3b."
+            "in config.toml, or check that model.think is false (or low for gpt-oss)."
             % model.get("timeout_seconds", 300)
         )
 
@@ -404,17 +623,78 @@ def call_model(config, system, user, schema):
             "model '%s' is not present. Pull it with 'ollama pull %s'."
             % (model["name"], model["name"])
         )
+    if response.status_code == 400 and "does not support thinking" in response.text:
+        fail(
+            "model '%s' has no reasoning mode, so think cannot be a level. "
+            "Set model.think = false in config.toml, or unset REVIEW_THINK."
+            % model["name"]
+        )
     if response.status_code != 200:
         fail("Ollama returned HTTP %s: %s" % (response.status_code, response.text[:300]))
 
     try:
-        return json.loads(response.json()["message"]["content"])
+        content = response.json()["message"]["content"]
+        result = json.loads(content)
     except (KeyError, ValueError):
         warn("model returned output that was not valid JSON, dropping it.")
-        return None
+        content, result = None, None
+    audit(config, system, user, content)
+    return result
+
+
+def audit(config, system, user, content):
+    """Append one record per model call to the audit log, if one is set.
+
+    Module 6 audit logging. Each record holds the model, its reasoning
+    setting, a sha256 of the exact prompt, the user prompt, and the raw
+    answer, so any verdict can be traced to what produced it. The log
+    contains source code from the review, so treat it like the code.
+    """
+    path = config["review"].get("audit_log")
+    if not path:
+        return
+    prompt = system + "\n\n" + user
+    record = {
+        "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "model": config["model"]["name"],
+        "think": config["model"].get("think"),
+        "sanitized": config["review"].get("sanitize_source", False),
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "user_prompt": user,
+        "answer": content,
+    }
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+    except OSError as exc:
+        warn("could not write the audit log at %s: %s" % (path, exc))
 
 
 # ------------------------------------------------------------- validation
+
+
+def _squash(text):
+    return " ".join(str(text).split())
+
+
+def evidence_matches(evidence, file_path, start, end):
+    """True when the quoted evidence really appears at the cited lines.
+
+    Compares the start of the evidence's first line, ignoring whitespace,
+    with the real file's lines from one before start to one after end. A
+    model that cites line 55 of app.py while quoting auth.py fails this.
+    """
+    path = REPO_ROOT / file_path
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    window = _squash(" ".join(lines[max(start - 2, 0):end + 1]))
+    # Models often copy the "94: " prefixes from the numbered source.
+    quoted = [re.sub(r"^\s*\d+:\s?", "", line) for line in str(evidence).splitlines()]
+    first = next((line for line in quoted if line.strip()), "")
+    probe = _squash(first)[:40]
+    return bool(probe) and probe in window
 
 
 def validate_finding(candidate, file_path, scanner_refs=None, line_budget=None):
@@ -456,6 +736,12 @@ def validate_finding(candidate, file_path, scanner_refs=None, line_budget=None):
     if not evidence:
         warn("dropped '%s': no evidence quoted." % title)
         return None
+    if (REPO_ROOT / file_path).is_file() and not evidence_matches(evidence, file_path, start, end):
+        warn(
+            "dropped '%s': the quoted evidence is not on lines %d-%d of %s."
+            % (title, start, end, file_path)
+        )
+        return None
 
     severity = str(candidate.get("severity", "")).lower()
     if severity not in SEVERITIES:
@@ -490,7 +776,7 @@ def triage_findings(config, prompts, scanner_findings, dry_run):
     rendered = []
 
     for scanner in scanner_findings:
-        source = numbered_source(REPO_ROOT / scanner["file"])
+        source = numbered_source(REPO_ROOT / scanner["file"], config["review"]["sanitize_source"])
         if source is None:
             continue
         total_lines = source.count("\n") + 1
@@ -513,9 +799,25 @@ def triage_findings(config, prompts, scanner_findings, dry_run):
     return findings, rendered
 
 
-def sweep_file(config, prompts, file_path, known, dry_run):
-    """Freeform review of one file, the secondary path."""
-    source = numbered_source(REPO_ROOT / file_path)
+def _ranges(lines):
+    """Compact a set of line numbers as '3-7, 12'."""
+    ordered, spans = sorted(lines), []
+    for number in ordered:
+        if spans and number == spans[-1][1] + 1:
+            spans[-1][1] = number
+        else:
+            spans.append([number, number])
+    return ", ".join(str(a) if a == b else "%d-%d" % (a, b) for a, b in spans)
+
+
+def sweep_file(config, prompts, file_path, known, dry_run, changed=None):
+    """Freeform review of one file, the secondary path.
+
+    With changed (the line numbers a diff added), the model is told to
+    review only those lines, using the rest of the file as context, and
+    findings in this file must touch a changed line.
+    """
+    source = numbered_source(REPO_ROOT / file_path, config["review"]["sanitize_source"])
     if source is None:
         return [], []
     total_lines = source.count("\n") + 1
@@ -528,19 +830,56 @@ def sweep_file(config, prompts, file_path, known, dry_run):
         "Already-known findings, do not repeat these:\n%s\n\n"
         "Numbered source of %s:\n%s" % (known_text, file_path, source)
     )
+    if changed:
+        user += (
+            "\n\nThis is a pull request. It changed lines %s of %s. Review the changed "
+            "code only. The rest of the file is context. Report defects in the changed "
+            "lines, or in code they depend on." % (_ranges(changed), file_path)
+        )
 
     if dry_run:
         return [], [{"system": prompts["sweep"], "user": user}]
 
-    result = call_model(config, prompts["sweep"], user, SWEEP_SCHEMA)
+    allowed = {file_path}
+    schema = SWEEP_SCHEMA
+    if config["review"]["repo_read"]:
+        focus = (
+            "The pull request changed lines %s. Ask for the code those lines depend on."
+            % _ranges(changed)
+        ) if changed else ""
+        context, read_files = gather_context(config, prompts, file_path, source, focus)
+        if context:
+            allowed |= read_files
+            schema = SWEEP_READ_SCHEMA
+            user += (
+                "\n\nOther code you asked to read:\n\n%s\n\n"
+                "For each finding, set file to where the defect is: %s, or one of the files "
+                "you read (%s). Cite that file's line numbers."
+                % (context, file_path, ", ".join(sorted(read_files)) or "none")
+            )
+
+    result = call_model(config, prompts["sweep"], user, schema)
     if result is None:
         return [], []
 
     findings = []
     for candidate in result.get("findings", []):
-        finding = validate_finding(candidate, file_path, None, line_budget=total_lines)
-        if finding:
-            findings.append(finding)
+        cited = str(candidate.get("file") or file_path).strip() if isinstance(candidate, dict) else file_path
+        if cited not in allowed:
+            warn("dropped a finding citing %s, which the model did not read." % cited)
+            continue
+        budget = total_lines if cited == file_path else len(
+            (REPO_ROOT / cited).read_text(encoding="utf-8", errors="replace").splitlines()
+        )
+        finding = validate_finding(candidate, cited, None, line_budget=budget)
+        if not finding:
+            continue
+        if changed and cited == file_path and not any(
+            finding["line_start"] <= n <= finding["line_end"] for n in changed
+        ):
+            warn("dropped '%s': not on a line this pull request changed." % finding["title"])
+            continue
+        findings.append(finding)
     return findings, []
 
 
@@ -570,6 +909,11 @@ def build_parser():
         "--dry-run",
         action="store_true",
         help="render the prompts and exit without calling the model",
+    )
+    parser.add_argument(
+        "--repo-read",
+        action="store_true",
+        help="with --no-scanner, let the model read named functions elsewhere in the repository first",
     )
     return parser
 
@@ -608,6 +952,10 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     config = load_config()
     prompts = load_prompts()
+    if args.repo_read:
+        config["review"]["repo_read"] = True
+    if config["review"]["repo_read"] and "repo_read" not in prompts:
+        fail("repo-read is on, but %s has no '## repo_read' section." % PROMPT_PATH)
 
     files, changed_lines = resolve_targets(args, config)
     target_label = args.file or (args.diff if args.diff else "staged changes")
@@ -648,8 +996,20 @@ def main(argv=None):
     rendered = []
 
     if args.no_scanner:
+        # Test files hold the exploits, so a cold review of them reports
+        # the bugs they test as if the bugs lived in the tests. The
+        # scanners still check test files; only the cold review skips them.
+        skipped = [p for p in files if looks_like_test_code(_relative(p))]
+        if skipped:
+            warn("the cold review skips %d test file(s); the scanner path still checks them." % len(skipped))
         for path in files:
-            found, render = sweep_file(config, prompts, _relative(path), [], args.dry_run)
+            rel = _relative(path)
+            if path in skipped:
+                continue
+            found, render = sweep_file(
+                config, prompts, rel, [], args.dry_run,
+                changed=(changed_lines or {}).get(rel),
+            )
             findings += found
             rendered += render
     else:

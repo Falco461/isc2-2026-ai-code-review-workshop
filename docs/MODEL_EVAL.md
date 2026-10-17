@@ -1,3 +1,49 @@
+# Model evaluation, October 2026
+
+Why the default is `qwen3.5:9b` with reasoning off, why `gpt-oss:20b` is the Module 2 model, and why `qwen2.5-coder:3b` is retired. The September 2026 record follows below for history.
+
+This is still a setup decision record, not the Phase 2 `eval-harness/`.
+
+## Method
+
+- Machine: MacBook Pro M5 Max, 48 GB, macOS. Ollama 0.35.1. Laptop timings will be several times slower.
+- The real `review.py`, run against `target-app`, scored against `target-app/PLANTED.md` (six planted bugs after bug 6 was reclassified, see below).
+- Temperature 0, `num_ctx` 8192, full JSON schema in Ollama's `format` field.
+- Triage: scanners on. A real bug counts when rated above `info`. A false positive counts when rated above `info` and the finding is about the flagged value.
+- Cold: `--no-scanner`. A bug counts when a finding's cited range covers it. "Unmatched" counts findings that match no planted bug.
+- Reasoning set explicitly through `think`: `false` for Qwen models, `"low"` for gpt-oss, which cannot turn reasoning off.
+
+## Triage, current prompt, five reps
+
+| Model | Size | SQLi | Secret key | Reporting token | Cmd inj | Bug 6 | False positives | Time |
+|---|---|---|---|---|---|---|---|---|
+| **qwen3.5:9b** (default) | 6.6 GB | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 0 | 25s |
+| **gpt-oss:20b** (Module 2) | 13 GB | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 0, one duplicate of bug 6 | 21s |
+| qwen2.5-coder:7b (fallback) | 4.7 GB | 5/5 | 5/5 | **0/5** | 5/5 | **0/5** | 0 | 14s |
+
+Three reps on the earlier prompt also covered `qwen2.5-coder:3b`, which dropped the hardcoded secret key and escalated a false positive in every run, and Cisco Foundation-Sec 1.1 8B Instruct, which dropped the secret key.
+
+## Cold discovery, three reps
+
+| Model | SQLi | Secret key | Reporting token | Cmd inj | Bug 6 | Path traversal | BOLA | Findings / unmatched | Time |
+|---|---|---|---|---|---|---|---|---|---|
+| qwen3.5:9b | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 0/3 | 0/3 | 5 / 1 | 22s |
+| gpt-oss:20b | 3/3 | 0/3 | 0/3 | 3/3 | 0/3 | **3/3** | 0/3 | 3 / **0** | 14s |
+| qwen2.5-coder:7b | 3/3 | 0/3 | 0/3 | 3/3 | 3/3 | 0/3 | 0/3 | 5 / 2 | 12s |
+| Foundation-Sec 1.1 8B | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 0/3 | 20 / **15** | 42s |
+| qwen2.5-coder:3b | 0/3 | 0/3 | 0/3 | 0/3 | n/a | 0/3 | 0/3 | 0 / 0 | 3s |
+
+## What changed since September
+
+1. **Bug 6.** `auth.py` line 56 accepts the literal `password123` for every account. It was listed as a scanner false positive. `gpt-oss:20b` reported it as a hardcoded credential, it is one, and it is now planted bug 6 with an exploit test.
+2. **The default dismissed it by trusting a docstring.** `qwen3.5:9b` rated bug 6 `info` in 5 of 5 runs, quoting "Demo comparison, not a real password check," and escalated the template on the line above instead. The prompt rule "only compared against" read as covering a literal that a user-supplied password is compared with. Rewording that rule took bug 6 from 0/5 to 5/5 with no false positives. This is the September self-describing-source problem again, in a newer model, and it is a Module 5 demo.
+3. **The 3B is retired.** On the hardened prompt it drops a real secret and escalates a false positive.
+4. **Reasoning models are usable** with reasoning set explicitly. `qwen3:4b` in September was left on its default and took minutes per review.
+5. **Security training is not code reading.** Foundation-Sec finds the reachable bugs cold but buries them in about 15 unmatched findings per run.
+6. **The models fail differently.** gpt-oss is the only model to find path traversal cold and makes no unmatched findings; the 7B finds bug 6 cold but misses it in triage. That is the Module 2 comparison lab.
+
+---
+
 # Model evaluation, September 2026
 
 Why the default model is `qwen2.5-coder:7b` and why `qwen2.5-coder:3b` is a triage-only tier.

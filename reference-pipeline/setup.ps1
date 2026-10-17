@@ -142,7 +142,7 @@ that host is remote, so this script will not pull to it.
 "@
     }
 
-    $reply = Read-Host "Pull it now? It is about 4.7 GB. [y/N]"
+    $reply = Read-Host "Pull it now? qwen3.5:9b is about 6.6 GB. [y/N]"
     if ($reply -match '^[yY]') {
         if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
             Die @"
@@ -157,8 +157,8 @@ the 'ollama' command is not on your PATH.
         Die @"
 cannot run the smoke test without the model.
      Pull it when you are ready with:  ollama pull $Model
-     Or switch to the smaller model with:
-       `$env:REVIEW_MODEL = "qwen2.5-coder:3b"
+     Low on memory or disk? See "If your laptop cannot run the model"
+     in README.md.
 "@
     }
 }

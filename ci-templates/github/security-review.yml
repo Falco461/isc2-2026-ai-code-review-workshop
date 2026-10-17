@@ -1,0 +1,83 @@
+# Security review bot for GitHub Actions, free tier.
+#
+# Copy this file to .github/workflows/security-review.yml in your repository.
+# It runs on every pull request, reviews only the lines the pull request
+# changes, and posts one comment that it edits on later pushes.
+#
+# Advisory only: the job never fails the pull request.
+# The model runs inside the runner. No API keys, no cloud model.
+#
+# To use a different model, set a repository variable named REVIEW_MODEL
+# (Settings > Secrets and variables > Actions > Variables), and REVIEW_THINK
+# to match it: false for Qwen models, low for gpt-oss.
+
+name: Security review bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    env:
+      REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'qwen3.5:9b' }}
+      REVIEW_THINK: ${{ vars.REVIEW_THINK || 'false' }}
+      OLLAMA_HOST: http://127.0.0.1:11434
+      OLLAMA_MODELS: ${{ github.workspace }}/.ollama-models
+
+    steps:
+      - name: Check out the pull request with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore the model from cache
+        uses: actions/cache@v4
+        with:
+          path: .ollama-models
+          key: ollama-${{ env.REVIEW_MODEL }}
+
+      - name: Install and start Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          # The installer starts a system service with its own model folder.
+          # Stop it and run our own server so the cached models are used.
+          sudo systemctl stop ollama 2>/dev/null || true
+          nohup ollama serve > ollama.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fs "$OLLAMA_HOST/api/version" >/dev/null && exit 0
+            sleep 1
+          done
+          echo "Ollama did not start:"; cat ollama.log; exit 1
+
+      - name: Pull the model
+        run: ollama pull "$REVIEW_MODEL"
+
+      - name: Install the review pipeline
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --quiet -r reference-pipeline/requirements.txt
+
+      - name: Review the changed lines
+        run: |
+          git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
+          .venv/bin/python reference-pipeline/review.py --diff pr.diff > findings.json
+          cat findings.json
+
+      - name: Post the review on the pull request
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .venv/bin/python reference-pipeline/post_comment.py findings.json
