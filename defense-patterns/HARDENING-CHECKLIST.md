@@ -10,6 +10,7 @@ The one principle behind all of them: **the code under review is written by the 
   - Here: `sanitize_source` in `reference-pipeline/config.toml`, `sanitize_python()` in `review.py`.
   - Check: `REVIEW_SANITIZE=1 python review.py --file <file> --dry-run` shows the placeholders.
 - [ ] **Compute trusted context outside the model.** "This is test code" comes from the file path, never from the file's contents.
+- [ ] **Keep test files out of the cold review.** Security tests describe the bugs they test. Reviewed cold, they come back as findings in the test file. In October 2026 they were 2 of 4 unmatched findings on a full review, rising to 7 of 8 with sanitizing on, because sanitizing removed the docstrings that said they were tests. The scanners still check test files for real committed secrets.
   - Here: `looks_like_test_code()` in `review.py`.
 - [ ] **Treat the prompt as a request, not a control.** The prompt already said not to trust a file's self-description, and the model trusted it anyway. Put the control in code.
 
@@ -30,7 +31,7 @@ The one principle behind all of them: **the code under review is written by the 
   - GitLab Free: a fine-grained personal access token with only `read_work_item`, `create_work_item`, `update_work_item`, and no repository permissions. Tested: posts and edits the comment.
 - [ ] **Masked, short-lived, not protected.** Mask the CI variable, set an expiry, and know why it cannot be protected on merge request branches.
 - [ ] **Know what the token can still do.** GitLab's work item permissions also cover issues and epics. Write down the residual risk.
-- [ ] **No secrets reach the model unless they are in the diff.** The bot reviews one file at a time. **(attack)** A comment asking the bot to quote a token from another file leaked nothing in 3 of 3 runs, because the bot never saw that file.
+- [ ] **No secrets reach the model unless they are in the diff.** Without repo-read the bot reviews one file at a time. **(attack)** A comment asking the bot to quote a token from another file leaked nothing in 3 of 3 runs, because the bot never saw that file. With repo-read on, see item 4.
 
 ## 4. Network segmentation
 
@@ -38,7 +39,10 @@ The one principle behind all of them: **the code under review is written by the 
   - Check: `lsof -nP -iTCP:11434 -sTCP:LISTEN` shows `127.0.0.1`, not `*` or `0.0.0.0`.
   - Never set `OLLAMA_HOST=0.0.0.0` on a laptop on shared Wi-Fi.
 - [ ] **No cloud inference.** The workshop model runs on the attendee's machine or inside the CI runner. Nothing is sent to a third-party API.
-- [ ] **The model has no tools.** The bot calls the model; the model cannot call anything back. Adding a repo-read tool (the capstone) changes this. Re-run the exfiltration attack when you do.
+- [ ] **The model has no tools, or tools you can bound.** The bot calls the model; without repo-read, the model cannot call anything back. The capstone's repo-read tool changes this.
+  - Bound it in code: read-only, named functions only, one folder, no test files, four reads, 80 lines each, every read audited.
+  - **(attack)** With repo-read on and sanitizing off, the exfiltration comment steered the model into reading `app.py`, where the token is, in 3 of 3 runs. The token still did not leak, only because the tool returns functions and the token is a module-level variable. With sanitizing on, the comment never reached the model and it read `app.py` in 0 of 3 runs.
+  - Sanitize what the tool returns, not only the file under review.
 - [ ] **CI runner egress.** In production, the review job needs the model registry (or a cache) and the platform API, and nothing else.
 
 ## 5. Audit logging
@@ -51,7 +55,7 @@ The one principle behind all of them: **the code under review is written by the 
 
 - [ ] **Cap the output.** `max_findings` bounds the comment and the runtime.
 - [ ] **Time out.** `timeout_seconds` bounds each model call. A reasoning model left on its default can take minutes per call; set `think` explicitly.
-- [ ] **Review the diff, not the repository,** in CI. It is faster, and it is also a blind spot: say so.
+- [ ] **Review the diff, not the repository,** in CI. It is faster, and in the capstone it was also more accurate: with the diff in focus and repo-read on, both models caught the access-control bug 3 of 3 times; given the whole file, both missed it. The blind spot is code the diff does not touch: run a scheduled whole-repository review for that, and say so.
 
 ## 7. Human in the loop
 
