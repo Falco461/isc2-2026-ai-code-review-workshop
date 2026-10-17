@@ -31,6 +31,10 @@ Both are reasoning-capable models. The bot sets reasoning explicitly for each on
 
 The 120B-class self-hosted tier is not something you run on a laptop. It appears in Module 7 as the scale-up reference architecture.
 
+## Get started
+
+Follow [`lab-guide/00-setup.md`](lab-guide/00-setup.md): clone this repository, run the setup script, and see `SMOKE TEST PASSED`. Every lab is in [`lab-guide/`](lab-guide/).
+
 ## Two-day outline
 
 Both days run 8:00 AM to 5:00 PM with an hour for lunch and two breaks.
@@ -78,9 +82,11 @@ Please complete all of this **before you travel**. The model download is several
 
 Any one of these:
 
-- Windows 11
-- macOS 13 Ventura or newer, Apple Silicon or Intel
-- Linux, Ubuntu 22.04 or newer or equivalent
+- macOS 13 Ventura or newer, Apple Silicon or Intel. Apple Silicon is the smoothest path.
+- Linux, Ubuntu 22.04 or newer or equivalent.
+- **Windows, or any laptop you cannot install software on:** use a GitHub Codespace in your browser instead. It is a Linux machine with everything preinstalled, and it needs only a free GitHub account. It has no GPU, so reviews are slower: about 1 to 2 minutes per file. See `lab-guide/00-setup.md`.
+
+Native Windows is not supported in the room.
 
 ### Software
 
