@@ -163,14 +163,19 @@ That is a mechanism, not a promise. Plan on your own laptop running the model.
 
 ## Structure
 
-- `reference-pipeline/` Working review bot: setup scripts, CLI, smoke test, and tests
-- `target-app/` Intentionally vulnerable Flask application used throughout the labs
+- `reference-pipeline/` Working review bot: setup scripts, CLI, comment poster, smoke test, and tests
+- `target-app/` Intentionally vulnerable Flask application used throughout the labs, with its answer key in `PLANTED.md`
 - `prompts/` Prompt templates with documentation
-- `eval-harness/` Detection-rate measurement and capstone scoring
-- `defense-patterns/` Prompt injection mitigations specific to the code review context
+- `ci-templates/` GitHub Actions and GitLab CI templates for free runners, and the Module 4 practice patch
+- `attack-lab/` Module 5 attacks on the bot, run unhardened and hardened
+- `defense-patterns/` The hardening checklist, the take-home deliverable
+- `production/` Module 7 reference architecture and the TCO model (`tco-model.xlsx`)
+- `eval-harness/` Module 8 capstone scoring and the planted-bug scorer
+- `instructor/` Copying models to USB drives for offline installs
+- `lab-guide/` Step-by-step instructions for every module
+- `.devcontainer/` GitHub Codespaces setup, for Windows and anyone without a capable laptop
 - `docs/` Build brief, model evaluation, and the proposal of record
 - `slides/` Workshop slides (published after delivery)
-- `lab-guide/` Step-by-step workshop instructions (published after delivery)
 
 ## Topics
 

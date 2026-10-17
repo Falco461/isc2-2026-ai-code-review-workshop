@@ -64,7 +64,7 @@ The fallback story is `qwen2.5-coder:7b` (4.7 GB, no reasoning mode) plus pairin
 - LLM access is Ollama's HTTP API called directly with requests. Base URL from `OLLAMA_HOST` (default `http://127.0.0.1:11434`). Model name from `config.toml`, overridable by `REVIEW_MODEL`. Changing the default stays a one-line change.
 - Structured output: pass a full JSON schema to Ollama's `format` field, not the string `"json"`. Schema-constrained decoding produced valid output on every run of every model tested, where asking for JSON in the prompt produced malformed arrays and wrong enum casing. Validate in code anyway, and drop anything that fails validation with a logged warning.
 - No em dashes anywhere: docs, comments, strings, commit messages. Use commas, colons, or parentheses instead.
-- Attendee voice in all docs: short sentences, every command shown for bash and PowerShell, every error message names the fix.
+- Attendee voice in all docs: short sentences, every command shown for bash (macOS, Linux, and Codespaces; there is no native Windows path), every error message names the fix.
 - Git: one commit per deliverable, descriptive messages, no force push, never modify LICENSE. Run the smoke test before any commit that touches code.
 
 ## Phase order
@@ -78,3 +78,5 @@ Promised in the submission and therefore Phase 2 work, not optional extras:
 - Practice repositories with planted bugs that attendees push to their own GitHub or GitLab account, so they see findings land in the PR or MR interface rather than only in a terminal.
 - A hardening checklist deliverable.
 - A TCO model for self-hosted versus commercial, which is the third published takeaway.
+
+Phase 2 status, October 17, 2026: all of the above is built and tested, plus the Module 5 attack lab, Module 6 defenses (sanitizing, audit log, evidence check), the Module 8 repo-read tool and capstone, the Module 7 architecture page and TCO workbook, Codespaces, and lab guides 00 to 08. Branch `phase2/model-update` merges to main on October 21. The TCO workbook is built by a script kept in the project folder, not this repository.

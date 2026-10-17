@@ -21,8 +21,8 @@ Step-by-step instructions for every lab. Work through them in order. Each one sa
 |---|---|---|
 | 8:15 | 5. Attacking Your Own Bot | [05-attacking-your-bot.md](05-attacking-your-bot.md) |
 | 10:15 | 6. Defenses and Enterprise Hardening | [06-defenses.md](06-defenses.md) |
-
-Modules 7 and 8 are added before the workshop.
+| 12:45 | 7. Production Architecture | [07-production.md](07-production.md) |
+| 14:30 | 8. Capstone | [08-capstone.md](08-capstone.md) |
 
 ## Where you are working
 

@@ -22,3 +22,8 @@ findings.json
 
 # Module 6 audit logs hold reviewed source code
 audit*.jsonl
+
+# Module 8 capstone diff
+pr.diff
+scanner.json
+sweep.json
