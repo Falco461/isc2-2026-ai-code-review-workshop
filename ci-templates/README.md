@@ -20,11 +20,6 @@ git remote add mine <your-repository-url>
 git push mine HEAD:main
 ```
 
-```powershell
-git remote add mine <your-repository-url>
-git push mine HEAD:main
-```
-
 ## GitHub Actions
 
 1. Copy the workflow into place on `main` and push it:
@@ -32,14 +27,6 @@ git push mine HEAD:main
    ```bash
    mkdir -p .github/workflows
    cp ci-templates/github/security-review.yml .github/workflows/
-   git add .github/workflows/security-review.yml
-   git commit -m "Add the security review bot"
-   git push mine HEAD:main
-   ```
-
-   ```powershell
-   New-Item -ItemType Directory -Force .github/workflows | Out-Null
-   Copy-Item ci-templates/github/security-review.yml .github/workflows/
    git add .github/workflows/security-review.yml
    git commit -m "Add the security review bot"
    git push mine HEAD:main
@@ -72,13 +59,6 @@ Nothing else to set up. The workflow uses the built-in `GITHUB_TOKEN`.
    git push mine HEAD:main
    ```
 
-   ```powershell
-   Copy-Item ci-templates/gitlab/security-review.gitlab-ci.yml .gitlab-ci.yml
-   git add .gitlab-ci.yml
-   git commit -m "Add the security review bot"
-   git push mine HEAD:main
-   ```
-
 3. Open a merge request with the lab change (see below).
 4. Watch **Build > Pipelines**. When the job finishes, the bot's comment appears on the merge request.
 
@@ -89,14 +69,6 @@ The pipeline asks for GitLab's medium runner, because the default model needs mo
 `lab/add-order-importer.patch` adds a small, plausible feature with three real bugs in it. Apply it on a new branch and open a pull or merge request from that branch:
 
 ```bash
-git switch -c add-order-importer
-git apply ci-templates/lab/add-order-importer.patch
-git add target-app/importer.py
-git commit -m "Add bulk order import"
-git push mine add-order-importer
-```
-
-```powershell
 git switch -c add-order-importer
 git apply ci-templates/lab/add-order-importer.patch
 git add target-app/importer.py
