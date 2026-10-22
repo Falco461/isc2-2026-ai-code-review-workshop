@@ -42,7 +42,9 @@ cat <<MSG
 The codespace is ready. In a new terminal:
 
   source .venv/bin/activate
-  cd reference-pipeline
-  python smoke.py
+  python reference-pipeline/review.py --file target-app/models.py
+
+You should see a finding on line 59. The first review takes about
+3 minutes while the model loads.
 
 MSG

@@ -4,6 +4,8 @@ Put the bot in a real pipeline on your own GitHub or GitLab account, open a pull
 
 Pick one platform. You do not need both.
 
+All commands run from the repository root. If your prompt ends in `reference-pipeline`, run `cd ..` first.
+
 ## Time
 
 About 20 minutes of setup, then about 8 minutes per pipeline run. The run is slow because the free runner has no GPU. It never blocks the merge, so nobody waits on it.
