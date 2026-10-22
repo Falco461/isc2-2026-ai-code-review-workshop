@@ -91,6 +91,12 @@ less ../target-app/PLANTED.md
 
 How many of the six planted bugs did the bot find? Which ones can no scanner and no model find without reading another file? That gap is the capstone.
 
+Go back to the repository root before Module 4:
+
+```bash
+cd ..
+```
+
 ## Instructor notes
 
 - Expected full-app findings with `qwen3.5:9b`: SQL injection, both secrets in `app.py`, command injection, and the universal password in `auth.py` escalated; the hash template on `auth.py:55` and the test fixture marked `info`.

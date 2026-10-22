@@ -60,13 +60,14 @@ source .venv/bin/activate
 2. Open https://github.com/cameronhopkin/isc2-2026-ai-code-review-workshop
 3. Select **Code > Codespaces > Create codespace on main**.
 4. Wait. The first start builds the machine, installs Ollama, and downloads the model. That takes about 5 minutes. Watch the terminal panel; it ends with `The codespace is ready.`
-5. In a new terminal in the codespace:
+5. In a new terminal in the codespace, check that the bot works by reviewing one file:
 
    ```bash
    source .venv/bin/activate
-   cd reference-pipeline
-   python smoke.py
+   python reference-pipeline/review.py --file target-app/models.py
    ```
+
+   **You are done when you see** JSON with a finding titled something like "SQL Injection" on line 59. The first review takes about 3 minutes because the model is loading; after that, about 40 seconds per file. (Do not run the full smoke test here: on a codespace it takes about 20 minutes.)
 
 **Know before you choose Codespaces:** it has no GPU, so the model runs on CPU. Reviewing one file takes about 1 to 2 minutes; reviewing the whole target app takes about 20 minutes. The labs tell you when to review a single file. For whole-app runs, pair with a neighbour on a laptop or watch the instructor's screen.
 

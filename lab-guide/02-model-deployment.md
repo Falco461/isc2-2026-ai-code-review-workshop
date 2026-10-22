@@ -45,7 +45,11 @@ cd reference-pipeline
 REVIEW_MODEL=qwen3.5:9b REVIEW_THINK=false python review.py --file ../target-app/app.py
 REVIEW_MODEL=qwen2.5-coder:7b REVIEW_THINK=false python review.py --file ../target-app/app.py
 REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=low python review.py --file ../target-app/app.py
+
+cd ..
 ```
+
+The last line takes you back to the repository root.
 
 Each prints JSON. Look at the `severity` of each finding.
 
