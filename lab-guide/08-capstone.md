@@ -142,6 +142,44 @@ Clean up when you are done:
 rm -f scanner.json sweep.json
 ```
 
+## 7. Plant a bug for your neighbour
+
+About 45 minutes, in pairs. The capstone used a bug we planted. Now you plant one.
+
+**Planter:** on a branch, add a real vulnerability to `target-app` without telling your partner what it is. Make it hard: the best ones look correct on their own, like the capstone's decorator. Then make the diff:
+
+```bash
+git switch -c planted
+# edit target-app
+git diff main > mine.diff
+```
+
+**Hunter:** on the planter's laptop, you get 10 minutes to find it by reading `mine.diff`. No bot. Write down what you think it is.
+
+**Then run all three bot paths on the diff:**
+
+```bash
+python reference-pipeline/review.py --diff mine.diff
+python reference-pipeline/review.py --diff mine.diff --no-scanner
+python reference-pipeline/review.py --diff mine.diff --no-scanner --repo-read
+```
+
+Score it: who found it, the hunter, the scanners, the cold review, or the cold review with repo-read? Then swap roles.
+
+Ideas if you are stuck: an open redirect, a reset token from `random`, a comparison that leaks timing, `yaml.load` on a request body, a new endpoint that forgot its decorator, a log line that writes the password.
+
+A worked example from the instructor's laptop, October 23: a new `/api/continue` endpoint that redirects to `request.args.get("next")`. The scanners reported nothing. The cold review caught the open redirect, with and without repo-read.
+
+Clean up afterwards:
+
+```bash
+git checkout main
+git branch -D planted
+rm -f mine.diff
+```
+
+Want to see it land in a real pull request? Push the branch to the repository you made in Module 4 and open a pull request. The bot comments in about 8 minutes.
+
 ## Discussion
 
 - Repo-read caught a bug no scanner and no diff-only review found. What did it cost? (Time, an extra model call, a new attack surface.)
@@ -155,3 +193,4 @@ rm -f scanner.json sweep.json
 - `eval-harness/capstone.py` takes about a minute for three runs of both configurations with `qwen3.5:9b` on an M5 Max (one review is about 10 seconds). Budget 5 to 10 minutes per configuration on Codespaces.
 - If a model scores diff-only above zero, read the finding: earlier versions of the scorer counted explanations that mentioned "authorized" while trusting the decorator.
 - Group comparison: collect each table's `capstone.py` result on the board, by model and by laptop.
+- Plant a bug: the open redirect worked example took under a minute to review on an M5 Max. If a pair plants something the bot misses with all three paths, put it on screen: that is the group comparison.

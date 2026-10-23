@@ -97,8 +97,42 @@ Go back to the repository root before Module 4:
 cd ..
 ```
 
+## Going further: the prompt tournament
+
+About 45 to 60 minutes, as tables. The scoring tool is the one Module 8 uses.
+
+Your bot's behavior is mostly the prompt in `prompts/review_system.md`. Change it, and score the result against the six planted bugs:
+
+```bash
+cp prompts/review_system.md prompts/review_system.md.orig
+# edit prompts/review_system.md
+python reference-pipeline/review.py --file target-app > scanner.json
+python reference-pipeline/review.py --file target-app --no-scanner > sweep.json
+python eval-harness/score_planted.py scanner.json sweep.json
+```
+
+The scorer prints which planted bugs were found, every finding that matched no planted bug, and a score: **10 points per planted bug found, minus 2 per unmatched finding**. Noise costs you.
+
+Rules:
+
+1. Edit only `prompts/review_system.md`. No code changes.
+2. Do not name the planted bugs or their lines in the prompt. A prompt that only works on this app is not a better prompt.
+3. Keep the section headings: `review.py` loads each section by its heading.
+4. Post your best score and one sentence on what you changed.
+
+The unchanged prompt scored 36 points on the instructor's laptop (4 of 6 planted bugs, 2 unmatched findings), the same in two runs on October 23. Path traversal and broken access control are the bugs to win. A full scored run takes about 2 minutes on a fast laptop; on Codespaces it takes about 40, so pair with a laptop.
+
+When you are done, put the original prompt back. Module 4 pushes the repository, and you want the original in CI:
+
+```bash
+mv prompts/review_system.md.orig prompts/review_system.md
+rm -f scanner.json sweep.json
+```
+
 ## Instructor notes
 
 - Expected full-app findings with `qwen3.5:9b`: SQL injection, both secrets in `app.py`, command injection, and the universal password in `auth.py` escalated; the hash template on `auth.py:55` and the test fixture marked `info`.
 - Path traversal (bug 5) and BOLA (bug 1) are not found. That is by design.
 - Before and after numbers for the docstring fix are in `docs/MODEL_EVAL.md`.
+- Prompt tournament: run it if Part 2 finishes before 14:15, or as the first activity after the break. Collect scores on the board. Ask the winner to read their change aloud, then ask the room whether it would generalize to other code.
+- Watch for rule 2. A prompt that says "check line 59 of models.py" scores well and teaches nothing.

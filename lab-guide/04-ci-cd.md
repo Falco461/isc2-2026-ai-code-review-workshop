@@ -27,13 +27,34 @@ Follow `../ci-templates/README.md`. It has every step for both platforms:
 
 Do not read `../ci-templates/lab/add-order-importer.patch` before the bot has reviewed it. Compare its comment with what you find yourself.
 
+## While the pipeline runs
+
+The first run takes about 8 minutes. Use it.
+
+### What can a finding put in the comment?
+
+The comment shows each finding's title and explanation. The model writes those, and the code it reads was written by the pull request author. Open `ci-templates/lab/hostile-findings.json`, change the `title` and `explanation` to anything you like, and see what the comment would look like:
+
+```bash
+python reference-pipeline/post_comment.py ci-templates/lab/hostile-findings.json --print
+```
+
+Try to break the table, inject HTML, hide text, add a link, mention a team. What gets through `escape()` in `reference-pipeline/post_comment.py`, and what does not? Write down anything that gets through. Day 2 tries to get the model to write it for you.
+
+Put the file back when you are done: `git checkout ci-templates/lab/hostile-findings.json`.
+
+### Read the workflow
+
+Open the template you used. Find the permissions, the cache, and the step that decides which lines changed. What would you change before this ran on your team's repositories?
+
 ## Discussion
 
 - The bot only reviews the lines the pull request changes. Why is that both faster and a blind spot?
-- The comment quotes code from the pull request, and whoever opened the pull request wrote that code. What could a hostile pull request put in the comment? (Look at `escape()` in `../reference-pipeline/post_comment.py`.)
+- The comment repeats what the model wrote about code from the pull request, and whoever opened the pull request wrote that code. What could a hostile pull request get into the comment? (Look at `escape()` in `reference-pipeline/post_comment.py`, and try the exercise above.)
 - GitLab free tier: the token can create and edit comments, and it can also touch issues. What would you change before using this at work? Day 2 picks this up.
 
 ## Instructor notes
 
 - Measured October 2026: GitHub free runner about 8.5 minutes total (6 minutes of review); GitLab medium runner about 10 minutes. Second runs restore the model from cache.
 - Have the instructor's own pull request open in a tab as a fallback demo: https://github.com/cameronhopkin/review-bot-ci-test/pull/1
+- While the pipeline runs: `escape()` stops HTML, pipes, newlines, and backticks, but not Markdown links or `@mentions`. Let the room find that. Do not fix it on Day 1; Module 5 tries to make the model write one and Module 6 fixes it.

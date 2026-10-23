@@ -20,7 +20,8 @@ The one principle behind all of them: **the code under review is written by the 
   - Here: `validate_finding()`. Check: Module 3, "Citation required".
 - [ ] **Constrain the shape.** Pass a full JSON schema to the model, then validate in code anyway. A schema constrains shape, not truth.
 - [ ] **Allow "no findings."** An empty result with a reason is a first-class answer, so the model is never pushed to invent one.
-- [ ] **Escape what you render.** The comment quotes code the pull request author wrote. Strip HTML, pipes, and newlines, and cap the length before it becomes Markdown.
+- [ ] **Escape what you render.** The comment repeats what the model wrote about code the pull request author controls. Strip HTML, pipes, and newlines, and cap the length before it becomes Markdown.
+  - Links and `@mentions` too. The model writes the title and explanation, and the author's code can steer what it writes. The workshop's `escape()` deliberately lets both through; Module 6 closes the gap. Remember that bare URLs autolink.
   - Here: `escape()` in `post_comment.py`, with tests for a hostile explanation.
 - [ ] **Watch for duplicates.** With sanitizing on, one finding can be widened to cover the bug on the next line and reported twice. Decide whether to merge overlapping findings.
 

@@ -59,6 +59,36 @@ Each prints JSON. Look at the `severity` of each finding.
 
 For each model: how many findings, what severity on line 17, and how long it took. Compare with your neighbour.
 
+## Going further
+
+About 30 minutes. Laptops with 24 GB of RAM or more only for the GPT-OSS parts; everyone else pairs up.
+
+### What does more thinking buy?
+
+GPT-OSS cannot turn reasoning off, but you can choose how much it does. Time the same review at each level:
+
+```bash
+cd reference-pipeline
+time REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=low python review.py --file ../target-app/auth.py
+time REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=medium python review.py --file ../target-app/auth.py
+time REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=high python review.py --file ../target-app/auth.py
+cd ..
+```
+
+Did the findings change, or only the time? Then try the default model with reasoning on:
+
+```bash
+cd reference-pipeline
+time REVIEW_MODEL=qwen3.5:9b REVIEW_THINK=true python review.py --file ../target-app/auth.py
+cd ..
+```
+
+Put the times on the board, by laptop. This is the data you need to choose a `think` setting for CI.
+
+### Same model, five runs
+
+Run the default model on `app.py` five times. Do you get the same findings every time? Temperature is 0 in `config.toml`. Day 2 comes back to why that is not a guarantee.
+
 ## Discussion
 
 - The fallback model rates the hardcoded API token on line 17 as `info`. A reviewer who trusts it ships a live credential.
@@ -70,3 +100,4 @@ For each model: how many findings, what severity on line 17, and how long it too
 - On an M5 Max each run takes 5 to 11 seconds. On CPU-only laptops expect a minute or more per model.
 - Measured results for all models are in `docs/MODEL_EVAL.md`. Foundation-Sec 8B (security-trained) is a good discussion point: it finds the bugs but buries them in about 15 unmatched findings per run.
 - A known hallucination to point out: models have described `tok_live_...` as a Stripe token. Nothing in the code says Stripe.
+- Going further: put a timing table on the board (model, think level, laptop, seconds). It feeds the Module 7 cost discussion.
