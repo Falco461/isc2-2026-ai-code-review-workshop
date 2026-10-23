@@ -1,0 +1,19 @@
+{
+  "model": "qwen3.5:9b",
+  "target": "pr.diff",
+  "no_findings_reason": null,
+  "findings": [
+    {
+      "id": "B105:target-app/importer.py:7",
+      "severity": "high",
+      "title": "Hardcoded token",
+      "file": "target-app/importer.py",
+      "line_start": 7,
+      "line_end": 7,
+      "evidence": "IMPORT_TOKEN = \"tok_live_example\"",
+      "explanation": "A live token is committed to the repository. Edit this text and the title, then run post_comment.py --print to see what reaches the comment.",
+      "scanner_ref": "B105",
+      "confidence": "high"
+    }
+  ]
+}

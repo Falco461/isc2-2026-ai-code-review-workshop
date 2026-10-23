@@ -87,7 +87,32 @@ What is the most damage that token could do if it leaked? What would you change 
 
 Open `defense-patterns/HARDENING-CHECKLIST.md`. Go through it for the bot on your laptop, ticking what is in place. Then go through it again for a bot you would run at work. The gap between the two lists is your plan.
 
+## Going further
+
+About 30 to 45 minutes.
+
+### Defend against the leaderboard
+
+Take the attack that scored highest on the Module 5 leaderboard. Write a defense in code, not in the prompt, and rerun the attack. Did it hold? Did the bot still find every planted bug? (Section 2 shows how to check.)
+
+### Close the gap in `escape()`
+
+If anyone got a link or an `@mention` into a comment, `escape()` let it through. Fix it in `reference-pipeline/post_comment.py`, and add a test to `reference-pipeline/tests/test_post_comment.py` that fails before your fix and passes after:
+
+```bash
+cd reference-pipeline
+python -m pytest tests/test_post_comment.py -q
+cd ..
+```
+
+A link and a mention are not bugs in the code you reviewed. They are bugs in what your bot says about it, posted under the bot's name.
+
+### Price each defense
+
+Run the Module 3 tournament scoring with sanitizing off, then on. Does sanitizing cost points anywhere? A control that quietly loses real findings is a control someone will turn off.
+
 ## Instructor notes
 
 - Sanitizing and audit logging are off by default so Day 1 and Module 5 show the unhardened bot. Both are one setting in `reference-pipeline/config.toml`.
 - On Codespaces, run one attack at a time: `REVIEW_SANITIZE=1 python attack-lab/run_attack.py test-fixture-docstring`.
+- `escape()` fix, if a table needs a hint: escape `[` and `]`, and put a zero-width space after `@`. Then ask what else GitHub turns into a link. Bare URLs autolink too, so a complete fix also breaks the scheme (for example `https://` to `https[:]//`), or drops URLs from model-written text entirely.

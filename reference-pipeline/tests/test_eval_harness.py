@@ -103,3 +103,11 @@ def test_path_traversal_at_the_endpoint_counts_when_it_says_traversal():
                 explanation="The name is not validated.")
     assert score_planted.score([hit])[0][4]["found"]
     assert not score_planted.score([miss])[0][4]["found"]
+
+
+def test_tournament_points_reward_bugs_and_charge_for_noise():
+    results, extras = score_planted.score([
+        finding("target-app/models.py", 59),
+        finding("target-app/app.py", 3, "Something unrelated"),
+    ])
+    assert score_planted.points(results, extras) == 10 - 2

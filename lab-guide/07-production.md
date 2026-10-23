@@ -74,6 +74,19 @@ On Codespaces or a CPU-only laptop, run only the smoke test.
 
 The table in `production/README.md` lists six signals, all from the audit log, the CI job, or the comment. Pick the two you would put on a dashboard first, and the threshold that would page someone. Be ready to defend it in the group discussion.
 
+## 5. Table presentations
+
+About 40 minutes: 15 to prepare, then 5 minutes per table.
+
+Use the pipeline you drew in Module 1. Each table presents:
+
+1. **Which tier,** and why not the one next to it.
+2. **The TCO,** with your own numbers in the yellow cells. Name the one input you are least sure of.
+3. **Two signals** you would put on a dashboard, and the threshold that pages someone.
+4. **Who owns the model update gate,** and what happens when that person is on vacation.
+
+The room asks one question per table. The best question wins.
+
 ## Discussion
 
 - Tier 1 needs no hardware and sends no code anywhere. What would make you move off it?
@@ -85,3 +98,4 @@ The table in `production/README.md` lists six signals, all from the audit log, t
 - Section 1 runs on one machine. On Codespaces it works the same way inside the codespace.
 - The tier 1 review time (8 to 12 minutes per job) was measured on a free GitHub runner in October 2026. Every other default in the workbook is a placeholder and says so.
 - The workbook builds from a script kept in the project folder, not the repository, so attendees do not need `openpyxl`.
+- Table presentations work best with a hard 5-minute timer. If time is short, do three tables and collect the rest on paper.

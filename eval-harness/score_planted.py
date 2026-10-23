@@ -84,6 +84,15 @@ def score(findings):
     return results, extras
 
 
+POINTS_PER_BUG = 10
+POINTS_PER_UNMATCHED = -2
+
+
+def points(results, extras):
+    """Module 3 tournament score: a found bug is worth more than a noisy finding costs."""
+    return POINTS_PER_BUG * sum(r["found"] for r in results) + POINTS_PER_UNMATCHED * len(extras)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Score findings against target-app/PLANTED.md.")
     parser.add_argument("findings", nargs="+", help="review.py JSON output files")
@@ -93,7 +102,7 @@ def main(argv=None):
     results, extras = score(load(args.findings))
     found = sum(r["found"] for r in results)
     if args.json:
-        print(json.dumps({"found": found, "of": len(results), "bugs": results,
+        print(json.dumps({"found": found, "of": len(results), "points": points(results, extras), "bugs": results,
                           "unmatched": [{"file": f["file"], "line": f["line_start"], "title": f["title"]}
                                         for f in extras]}, indent=2))
         return 0
@@ -105,6 +114,8 @@ def main(argv=None):
         print("\n%d finding(s) matched no planted bug. Real, or noise?" % len(extras))
         for f in extras:
             print("  %s:%d  [%s]  %s" % (f["file"], f["line_start"], f["severity"], f["title"]))
+    print("\nScore: %d points (%+d per planted bug found, %d per unmatched finding)."
+          % (points(results, extras), POINTS_PER_BUG, POINTS_PER_UNMATCHED))
     return 0
 
 
