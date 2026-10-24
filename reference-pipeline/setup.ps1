@@ -181,6 +181,7 @@ Write-Host @"
 Activate the environment in this shell with:
 
   .\.venv\Scripts\Activate.ps1
+  `$OutputEncoding = [System.Text.UTF8Encoding]::new(`$false)
 
 Then review the vulnerable app, from the repository root, with:
 
