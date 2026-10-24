@@ -75,21 +75,9 @@ say "Installed:"
 
 step "Checking Ollama"
 
-HOST="$("$VENV_PY" - "$SCRIPT_DIR" <<'PY'
-import os, sys, tomllib
-from pathlib import Path
-config = tomllib.loads((Path(sys.argv[1]) / "config.toml").read_text(encoding="utf-8"))
-print((os.environ.get("OLLAMA_HOST") or config["model"]["host"]).rstrip("/"))
-PY
-)"
-
-MODEL="$("$VENV_PY" - "$SCRIPT_DIR" <<'PY'
-import os, sys, tomllib
-from pathlib import Path
-config = tomllib.loads((Path(sys.argv[1]) / "config.toml").read_text(encoding="utf-8"))
-print(os.environ.get("REVIEW_MODEL") or config["model"]["name"])
-PY
-)"
+MODEL_CONFIG="$("$VENV_PY" "$SCRIPT_DIR/ollama_config.py" "$SCRIPT_DIR/config.toml")"
+HOST="${MODEL_CONFIG%%$'\n'*}"
+MODEL="${MODEL_CONFIG#*$'\n'}"
 
 say "Host:  $HOST"
 say "Model: $MODEL"
@@ -97,10 +85,10 @@ say "Model: $MODEL"
 if ! "$VENV_PY" -c "
 import sys, requests
 try:
-    requests.get('$HOST/api/version', timeout=5).raise_for_status()
-except Exception:
+    requests.get(sys.argv[1] + '/api/version', timeout=5).raise_for_status()
+except requests.exceptions.RequestException:
     sys.exit(1)
-" 2>/dev/null; then
+" "$HOST" 2>/dev/null; then
     die "Ollama is not answering at $HOST.
      Start it with:  ollama serve
      If you do not have it, install it from https://ollama.com/download
@@ -114,9 +102,9 @@ step "Checking the model"
 
 if "$VENV_PY" -c "
 import sys, requests
-tags = requests.get('$HOST/api/tags', timeout=10).json().get('models', [])
-sys.exit(0 if any(m.get('name') == '$MODEL' for m in tags) else 1)
-" 2>/dev/null; then
+tags = requests.get(sys.argv[1] + '/api/tags', timeout=10).json().get('models', [])
+sys.exit(0 if any(m.get('name') == sys.argv[2] for m in tags) else 1)
+" "$HOST" "$MODEL" 2>/dev/null; then
     say "Model $MODEL is present."
 else
     say "Model $MODEL is not present on $HOST."

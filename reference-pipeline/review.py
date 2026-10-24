@@ -28,6 +28,8 @@ from typing import NoReturn
 
 import requests
 
+from ollama_config import normalize_ollama_host
+
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
 CONFIG_PATH = HERE / "config.toml"
@@ -173,12 +175,13 @@ def load_config(path=CONFIG_PATH):
     review = config.setdefault("review", {})
 
     model["name"] = os.environ.get("REVIEW_MODEL") or model.get("name")
-    model["host"] = (os.environ.get("OLLAMA_HOST") or model.get("host") or "").rstrip("/")
+    try:
+        model["host"] = normalize_ollama_host(os.environ.get("OLLAMA_HOST") or model.get("host"))
+    except ValueError as exc:
+        fail(str(exc))
 
     if not model["name"]:
         fail("no model configured. Set model.name in config.toml or REVIEW_MODEL.")
-    if not model["host"]:
-        fail("no host configured. Set model.host in config.toml or OLLAMA_HOST.")
 
     model["think"] = parse_think(os.environ.get("REVIEW_THINK", model.get("think")))
 
