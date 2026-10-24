@@ -65,6 +65,17 @@ print('kept' if review.validate_finding(fake, 'target-app/app.py', line_budget=4
 "
 ```
 
+```powershell
+Set-Content check_citation.py @'
+import review
+fake = {'severity': 'high', 'title': 'Made up', 'line_start': 999, 'line_end': 999,
+        'evidence': 'nope', 'explanation': 'x', 'confidence': 'high'}
+print('kept' if review.validate_finding(fake, 'target-app/app.py', line_budget=40) else 'dropped')
+'@
+python check_citation.py
+Remove-Item check_citation.py
+```
+
 **You should see a warning and `dropped`.** A model that invents a line number does not get a comment.
 
 ### Refuse over guess

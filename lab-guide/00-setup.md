@@ -134,6 +134,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ### Reading the guides on Windows
 
+**Every PowerShell command from every module is on one page: [WINDOWS-CHEATSHEET.md](WINDOWS-CHEATSHEET.md).** Copy and paste from it rather than retyping.
+
 The guides show `bash` commands. Most work in PowerShell as written (`python`, `git`, `ollama`, `cd`, `cp`, `mv`). Where a command differs, the guide shows a `powershell` block next to it. The general rules:
 
 | bash | PowerShell |

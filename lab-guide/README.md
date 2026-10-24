@@ -4,6 +4,8 @@ Step-by-step instructions for every lab. Work through them in order. Each one sa
 
 ## Before Module 1
 
+**On Windows?** Every PowerShell command, in order, on one page: [WINDOWS-CHEATSHEET.md](WINDOWS-CHEATSHEET.md). Copy and paste, do not retype.
+
 - [00. Setup](00-setup.md): clone, install, run the smoke test. Do this first, at 8:00 on Day 1.
 
 ## Day 1
