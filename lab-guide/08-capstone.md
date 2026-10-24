@@ -67,12 +67,7 @@ python -c "import json; [print('read', r['user_prompt']) for r in map(json.loads
 $env:REVIEW_AUDIT_LOG = "audit-capstone.jsonl"
 python reference-pipeline/review.py --diff pr.diff --no-scanner --repo-read
 Remove-Item Env:REVIEW_AUDIT_LOG
-@'
-import json
-for r in map(json.loads, open("audit-capstone.jsonl")):
-    if "\n" not in r["user_prompt"]:
-        print("read", r["user_prompt"])
-'@ | python -
+python eval-harness/show_reads.py audit-capstone.jsonl
 ```
 
 **You should see** reads like `target-app/auth.py: require_order_access` and `target-app/models.py: get_order`, and a finding such as "Broken Access Control: User can access any order via IDOR vulnerability" on the endpoint.
@@ -120,13 +115,7 @@ for f, s in [('target-app/../reference-pipeline/review.py', 'main'), ('target-ap
 ```
 
 ```powershell
-@'
-import sys; sys.path.insert(0, "reference-pipeline")
-import review
-cfg = review.load_config(); scope = review.repo_scope("target-app/app.py")
-for f, s in [("target-app/../reference-pipeline/review.py", "main"), ("target-app/tests/conftest.py", "login"), ("target-app/auth.py", "nope")]:
-    print(review.read_symbol({"file": f, "symbol": s}, scope, cfg)[1])
-'@ | python -
+python eval-harness/try_read_limits.py
 ```
 
 **You should see** two refusals and a "not found."

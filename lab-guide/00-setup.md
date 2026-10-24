@@ -130,7 +130,6 @@ Do this in every new PowerShell window, from the repository folder:
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 ```
 
 ### Reading the guides on Windows
@@ -139,7 +138,7 @@ The guides show `bash` commands. Most work in PowerShell as written (`python`, `
 
 | bash | PowerShell |
 |---|---|
-| `source .venv/bin/activate` | `.\.venv\Scripts\Activate.ps1`, then the `$OutputEncoding` line |
+| `source .venv/bin/activate` | `.\.venv\Scripts\Activate.ps1` |
 | `REVIEW_MODEL=gpt-oss:20b python review.py ...` | `$env:REVIEW_MODEL = "gpt-oss:20b"; python review.py ...` |
 | (the setting ends with the command) | (the setting stays: undo it with `Remove-Item Env:REVIEW_MODEL`) |
 | `time python ...` | `Measure-Command { python ... }` |
@@ -147,7 +146,7 @@ The guides show `bash` commands. Most work in PowerShell as written (`python`, `
 | `less file` | `Get-Content file` |
 | `python3` | `python` |
 
-Saving output with `>` works: the tools read the files Windows PowerShell writes. The `$OutputEncoding` line in the activation step matters too: without it, Windows PowerShell can add an invisible marker when it pipes text into `python`, and the Python side fails with `Expecting value: line 1 column 1`. Run it in every new window, with the activate line.
+Saving output with `>` works: the tools read the files Windows PowerShell writes. Do not pipe text into `python` (`something | python ...`): Windows PowerShell 5.1 garbles it on the way in, and Python fails with `Expecting value: line 1 column 1`. The PowerShell blocks in the guides never do it; use them instead of translating a `bash` pipe yourself.
 
 ## Path B: GitHub Codespaces
 

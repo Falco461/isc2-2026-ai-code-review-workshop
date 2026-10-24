@@ -108,6 +108,10 @@ def points(results, extras):
 
 
 def main(argv=None):
+    # Windows writes redirected output in its legacy code page, which has no
+    # emoji and no typographic dashes. UTF-8 everywhere instead.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Score findings against target-app/PLANTED.md.")
     parser.add_argument("findings", nargs="+", help="review.py JSON output files")
     parser.add_argument("--json", action="store_true")

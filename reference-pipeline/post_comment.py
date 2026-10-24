@@ -202,6 +202,10 @@ def read_input_text(path):
 
 
 def main(argv=None):
+    # Windows writes redirected output in its legacy code page, which has no
+    # emoji and no typographic dashes. UTF-8 everywhere instead.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Post review.py findings as a PR or MR comment.")
     parser.add_argument("findings", help="JSON file written by review.py")
     parser.add_argument("--platform", choices=["github", "gitlab"], help="default: detected from the CI environment")

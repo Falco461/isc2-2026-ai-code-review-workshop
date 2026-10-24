@@ -18,11 +18,13 @@ REVIEW_SANITIZE=1 python reference-pipeline/review.py --file target-app/app.py -
 ```
 
 ```powershell
-$show = "import json,sys; print(json.load(sys.stdin)['prompts'][0]['user'])"
-python reference-pipeline/review.py --file target-app/app.py --dry-run | python -c $show | Select-Object -First 22
+python reference-pipeline/review.py --file target-app/app.py --dry-run > before.json
 $env:REVIEW_SANITIZE = "1"
-python reference-pipeline/review.py --file target-app/app.py --dry-run | python -c $show | Select-Object -First 22
+python reference-pipeline/review.py --file target-app/app.py --dry-run > after.json
 Remove-Item Env:REVIEW_SANITIZE
+(Get-Content before.json -Raw | ConvertFrom-Json).prompts[0].user -split "`n" | Select-Object -First 22
+(Get-Content after.json -Raw | ConvertFrom-Json).prompts[0].user -split "`n" | Select-Object -First 22
+Remove-Item before.json, after.json
 ```
 
 **You should see** the docstring at the top of `app.py` replaced with `"""[docstring removed by the review bot]"""`, and every code line still at the same line number.
