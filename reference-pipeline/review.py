@@ -8,7 +8,7 @@ a real file and line.
 
 Freeform review of raw code is the secondary path, behind --no-scanner.
 
-Exit code is always 0 in this phase. Blocking behavior is a later module.
+Findings do not block CI in this phase. Setup and scanner failures exit nonzero.
 """
 
 import argparse
@@ -263,6 +263,16 @@ def parse_sarif(document):
     return findings
 
 
+def scanner_failed(scanner, reason, stderr=""):
+    """Stop before an incomplete scan can be reported as clean."""
+    details = " stderr: %s" % stderr.strip()[:300] if stderr.strip() else ""
+    fail(
+        "%s %s. Run the setup script and use the workshop's .venv Python "
+        "(.venv/bin/python on macOS/Linux or .venv\\Scripts\\python.exe on Windows).%s"
+        % (scanner, reason, details)
+    )
+
+
 def run_bandit(targets, excluded):
     """Run Bandit and return normalized findings."""
     command = [sys.executable, "-m", "bandit", "-q", "-r", "-f", "sarif"]
@@ -274,14 +284,18 @@ def run_bandit(targets, excluded):
     completed = subprocess.run(
         command, cwd=REPO_ROOT, capture_output=True, text=True
     )
+    # Bandit returns 1 for findings, not just for failures.
+    if completed.returncode not in (0, 1):
+        scanner_failed("bandit", "exited with status %s" % completed.returncode, completed.stderr)
     if not completed.stdout.strip():
-        warn("bandit produced no output. stderr: %s" % completed.stderr.strip()[:300])
-        return []
+        scanner_failed("bandit", "produced no output", completed.stderr)
     try:
-        return parse_sarif(json.loads(completed.stdout))
+        document = json.loads(completed.stdout)
     except json.JSONDecodeError:
-        warn("bandit output was not valid SARIF, skipping its findings.")
-        return []
+        scanner_failed("bandit", "did not produce valid SARIF", completed.stderr)
+    if not isinstance(document, dict) or not isinstance(document.get("runs"), list) or not document["runs"]:
+        scanner_failed("bandit", "did not produce valid SARIF", completed.stderr)
+    return parse_sarif(document)
 
 
 def run_detect_secrets(targets):
@@ -297,14 +311,16 @@ def run_detect_secrets(targets):
     completed = subprocess.run(
         command, cwd=REPO_ROOT, capture_output=True, text=True
     )
+    if completed.returncode != 0:
+        scanner_failed("detect-secrets", "exited with status %s" % completed.returncode, completed.stderr)
     if not completed.stdout.strip():
-        warn("detect-secrets produced no output. stderr: %s" % completed.stderr.strip()[:300])
-        return []
+        scanner_failed("detect-secrets", "produced no output", completed.stderr)
     try:
         document = json.loads(completed.stdout)
     except json.JSONDecodeError:
-        warn("detect-secrets output was not valid JSON, skipping its findings.")
-        return []
+        scanner_failed("detect-secrets", "did not produce valid JSON", completed.stderr)
+    if not isinstance(document, dict) or not isinstance(document.get("results"), dict):
+        scanner_failed("detect-secrets", "did not produce valid scan results", completed.stderr)
 
     findings = []
     for filename, items in document.get("results", {}).items():
