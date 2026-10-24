@@ -32,6 +32,14 @@ git push mine HEAD:main
    git push mine HEAD:main
    ```
 
+   ```powershell
+   New-Item -ItemType Directory -Force .github\workflows | Out-Null
+   Copy-Item ci-templates\github\security-review.yml .github\workflows\
+   git add .github/workflows/security-review.yml
+   git commit -m "Add the security review bot"
+   git push mine HEAD:main
+   ```
+
 2. Open a pull request with the lab change (see "The lab change" below).
 3. Watch the **Actions** tab. When the job finishes, the bot's comment appears on the pull request.
 
