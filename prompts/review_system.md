@@ -71,6 +71,7 @@ Rules:
 5. Do not guess. Do not report a defect because the code looks like code that is often buggy. Report it because you can see it on a line you can name.
 6. `severity` and `confidence` must be lowercase.
 7. If you were given other code you asked to read, use it to judge the file under review. A decorator or helper named for a check is not proof the check happens: read what it does. When the defect is in code you read, cite that file and its lines.
+8. Follow the input. For every value that comes from a request (query string, form field, URL path), follow it to where it is used: a SQL query, a shell command, a file path, a redirect. Report the line where untrusted input reaches something dangerous. When a file path is built from a request value, consider what `..` in that value would do.
 
 ## repo_read
 

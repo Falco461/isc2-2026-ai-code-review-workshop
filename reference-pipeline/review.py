@@ -956,6 +956,11 @@ def build_parser():
         action="store_true",
         help="with --no-scanner, let the model read named functions elsewhere in the repository first",
     )
+    parser.add_argument(
+        "--sweep",
+        action="store_true",
+        help="after triaging scanner findings, also cold-review each file for what no scanner flags",
+    )
     return parser
 
 
@@ -1040,25 +1045,35 @@ def main(argv=None):
     findings = []
     rendered = []
 
-    if args.no_scanner:
+    if not args.no_scanner:
+        findings, rendered = triage_findings(config, prompts, scanner_findings, args.dry_run)
+
+    if args.no_scanner or args.sweep:
         # Test files hold the exploits, so a cold review of them reports
         # the bugs they test as if the bugs lived in the tests. The
         # scanners still check test files; only the cold review skips them.
         skipped = [p for p in files if looks_like_test_code(_relative(p))]
         if skipped:
             warn("the cold review skips %d test file(s); the scanner path still checks them." % len(skipped))
+        seen = [(f["file"], f["line_start"]) for f in findings]
+
+        def already_reported(f):
+            # The cold review often restates a scanner finding a line or two away.
+            return any(f["file"] == file and abs(f["line_start"] - line) <= 3 for file, line in seen)
+
         for path in files:
             rel = _relative(path)
             if path in skipped:
                 continue
+            # With --sweep, the scanner findings are already explained, so
+            # the cold review is told about them and asked for the rest.
+            known = [s for s in scanner_findings if s["file"] == rel]
             found, render = sweep_file(
-                config, prompts, rel, [], args.dry_run,
+                config, prompts, rel, known, args.dry_run,
                 changed=(changed_lines or {}).get(rel),
             )
-            findings += found
+            findings += [f for f in found if not already_reported(f)]
             rendered += render
-    else:
-        findings, rendered = triage_findings(config, prompts, scanner_findings, args.dry_run)
 
     if args.dry_run:
         print(json.dumps(

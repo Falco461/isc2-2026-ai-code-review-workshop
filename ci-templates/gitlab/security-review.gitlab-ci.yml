@@ -50,7 +50,7 @@ security-review:
   script:
     - git fetch --quiet origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
     - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" > mr.diff
-    - .venv/bin/python reference-pipeline/review.py --diff mr.diff > findings.json
+    - .venv/bin/python reference-pipeline/review.py --diff mr.diff --sweep > findings.json
     - cat findings.json
   after_script:
     - .venv/bin/python reference-pipeline/post_comment.py findings.json

@@ -131,3 +131,20 @@ def test_review_and_post_comment_read_utf16_files(tmp_path):
     f.write_bytes(text.encode("utf-16"))
     assert review.read_input_text(f) == text
     assert post_comment.read_input_text(f) == text
+
+
+def test_sweep_adds_a_cold_review_after_triage():
+    """--sweep: scanner findings are triaged, then each file is cold-reviewed too."""
+    import json
+    import subprocess
+
+    completed = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "reference-pipeline" / "review.py"),
+         "--file", "target-app/app.py", "--sweep", "--dry-run"],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    users = [p["user"] for p in json.loads(completed.stdout)["prompts"]]
+    assert sum(u.startswith("Scanner:") for u in users) >= 1
+    sweep = [u for u in users if u.startswith("Already-known findings")]
+    assert len(sweep) == 1 and "line 15" in sweep[0]
