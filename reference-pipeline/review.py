@@ -710,6 +710,15 @@ def evidence_matches(evidence, file_path, start, end):
     quoted = [re.sub(r"^\s*\d+:\s?", "", line) for line in str(evidence).splitlines()]
     first = next((line for line in quoted if line.strip()), "")
     probe = _squash(first)[:40]
+    if probe and probe in window:
+        return True
+    # Some models (gpt-oss) wrap the quote in a JSON-escaped string:
+    # "app.secret_key = \"sk-...\"" for app.secret_key = "sk-...".
+    unwrapped = first.strip()
+    if len(unwrapped) > 1 and unwrapped[0] == unwrapped[-1] and unwrapped[0] in "\"'`":
+        unwrapped = unwrapped[1:-1]
+    unwrapped = unwrapped.replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
+    probe = _squash(unwrapped)[:40]
     return bool(probe) and probe in window
 
 

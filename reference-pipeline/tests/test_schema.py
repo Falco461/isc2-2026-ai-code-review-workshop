@@ -187,3 +187,13 @@ def test_test_code_is_flagged_as_context_for_the_model():
     scanner = dict(SCANNER, file="target-app/tests/conftest.py")
     user = review.build_triage_user(scanner, "1: x = 1")
     assert "test or fixture code" in user
+
+
+def test_evidence_wrapped_in_escaped_quotes_still_matches():
+    """gpt-oss quotes the line as a JSON-escaped string inside the string."""
+    wrapped = '"sql = \\"SELECT id, item FROM orders WHERE item LIKE \'%%%s%%\'\\" % query"'
+    assert validate({"evidence": wrapped}) is not None
+
+
+def test_wrapping_does_not_let_other_text_through():
+    assert validate({"evidence": '"if password == \\"password123\\":"'}) is None
