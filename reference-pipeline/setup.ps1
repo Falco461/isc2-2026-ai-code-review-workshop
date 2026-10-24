@@ -90,17 +90,8 @@ Say "Installed:"
 
 Step "Checking Ollama"
 
-$ConfigReader = @"
-import os, sys, tomllib
-from pathlib import Path
-config = tomllib.loads((Path(sys.argv[1]) / 'config.toml').read_text(encoding='utf-8'))
-host = (os.environ.get('OLLAMA_HOST') or config['model']['host']).rstrip('/')
-model = os.environ.get('REVIEW_MODEL') or config['model']['name']
-print(host)
-print(model)
-"@
-
-$ConfigValues = & $VenvPy -c $ConfigReader $ScriptDir
+$ConfigValues = & $VenvPy (Join-Path $ScriptDir "ollama_config.py") (Join-Path $ScriptDir "config.toml")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $OllamaHost = $ConfigValues[0]
 $Model      = $ConfigValues[1]
 
@@ -109,9 +100,9 @@ Say "Model: $Model"
 
 & $VenvPy -c "import sys, requests
 try:
-    requests.get('$OllamaHost/api/version', timeout=5).raise_for_status()
-except Exception:
-    sys.exit(1)" 2>$null
+    requests.get(sys.argv[1] + '/api/version', timeout=5).raise_for_status()
+except requests.exceptions.RequestException:
+    sys.exit(1)" $OllamaHost 2>$null
 
 if ($LASTEXITCODE -ne 0) {
     Die @"
@@ -127,8 +118,8 @@ Say "Ollama is up."
 Step "Checking the model"
 
 & $VenvPy -c "import sys, requests
-tags = requests.get('$OllamaHost/api/tags', timeout=10).json().get('models', [])
-sys.exit(0 if any(m.get('name') == '$Model' for m in tags) else 1)" 2>$null
+tags = requests.get(sys.argv[1] + '/api/tags', timeout=10).json().get('models', [])
+sys.exit(0 if any(m.get('name') == sys.argv[2] for m in tags) else 1)" $OllamaHost $Model 2>$null
 
 if ($LASTEXITCODE -eq 0) {
     Say "Model $Model is present."

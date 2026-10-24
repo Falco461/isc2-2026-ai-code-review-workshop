@@ -183,6 +183,12 @@ A free GitHub account includes 120 core-hours of Codespaces a month. This codesp
 | The smoke test is very slow | Your laptop is running the model on CPU. It still works. Pair with a neighbour for the whole-app runs. |
 | `SMOKE TEST FAILED` | The output above it names which check failed. Show it to the instructor. |
 
+`OLLAMA_HOST` accepts both `host:port` (for example, `localhost:11434`) and full
+HTTP or HTTPS URLs. The setup scripts and review bot add `http://` when the
+scheme is missing. Listener addresses such as `0.0.0.0:11434` are mapped to
+loopback for client requests. An invalid address reports a configuration error
+with an example you can use.
+
 ## Model from the USB stick
 
 The stick, labelled **Workshop**, holds `qwen3.5:9b` and the low-memory fallback `qwen2.5-coder:7b`. Quit Ollama first (menu bar or system tray icon > Quit), copy, then start Ollama again.
