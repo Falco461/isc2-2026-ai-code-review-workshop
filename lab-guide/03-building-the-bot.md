@@ -24,6 +24,10 @@ On a Mac this takes under a minute. On Codespaces or a CPU-only laptop it takes 
 python -m json.tool findings.json
 ```
 
+```powershell
+Get-Content findings.json | python -m json.tool
+```
+
 Every finding has a `file`, a `line_start`, the exact source line in `evidence`, a `severity`, and an `explanation`. **You should see about 8 findings, some of them marked `info`.**
 
 Compare with your Module 1 answers. Which findings did the bot escalate, and which did it mark as false positives?
@@ -89,6 +93,10 @@ During the build of this workshop, the default model rated line 56 as `info` in 
 less ../target-app/PLANTED.md
 ```
 
+```powershell
+Get-Content ..\target-app\PLANTED.md
+```
+
 How many of the six planted bugs did the bot find? Which ones can no scanner and no model find without reading another file? That gap is the capstone.
 
 Go back to the repository root before Module 4:
@@ -127,6 +135,11 @@ When you are done, put the original prompt back. Module 4 pushes the repository,
 ```bash
 mv prompts/review_system.md.orig prompts/review_system.md
 rm -f scanner.json sweep.json
+```
+
+```powershell
+Move-Item -Force prompts\review_system.md.orig prompts\review_system.md
+Remove-Item scanner.json, sweep.json -ErrorAction SilentlyContinue
 ```
 
 ## Instructor notes
