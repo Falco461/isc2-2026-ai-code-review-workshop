@@ -66,6 +66,29 @@ Each prints JSON. Look at the `severity` of each finding.
 
 **What to look for:** `app.py` has two hardcoded credentials, on lines 15 and 17. Do all three models rate both of them as real?
 
+### If GPT-OSS reports no findings
+
+A warning that a finding was dropped because its quoted evidence is not on the
+cited lines means the model's answer failed citation checking. If the output
+says the scanners reported two items but none survived, both scanners ran;
+the empty findings list does not mean the code is clean.
+
+GPT-OSS sometimes puts an extra JSON string wrapper around an otherwise correct
+source quote, adding outer quotes and backslash escapes. The current bot handles
+that wrapping when matching evidence against the source. It still rejects a
+quote from the wrong file or line, or text that does not match the source.
+
+If an older checkout drops both credential findings for this reason, update it
+from the repository root, then rerun the GPT-OSS command above:
+
+```bash
+git pull --ff-only
+```
+
+The update command also works in PowerShell. If citation warnings remain,
+inspect the model's evidence and its cited lines. A model can still quote the
+source incorrectly, and those findings should be rejected.
+
 ## 4. Write down what you saw
 
 For each model: how many findings, what severity on line 17, and how long it took. Compare with your neighbour.
