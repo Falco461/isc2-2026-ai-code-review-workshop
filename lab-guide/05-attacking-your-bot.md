@@ -72,6 +72,12 @@ python attack-lab/run_attack.py my-attack --reps 3
 REVIEW_SANITIZE=1 python attack-lab/run_attack.py my-attack --reps 3
 ```
 
+```powershell
+python attack-lab/run_attack.py my-attack --reps 3
+$env:REVIEW_SANITIZE = "1"; python attack-lab/run_attack.py my-attack --reps 3
+Remove-Item Env:REVIEW_SANITIZE
+```
+
 For the 5-point challenge, edit a file in your own checkout by hand, review it, and render the comment:
 
 ```bash
@@ -79,6 +85,13 @@ python reference-pipeline/review.py --file target-app/app.py > attacked.json
 python reference-pipeline/post_comment.py attacked.json --print
 git checkout target-app/app.py
 rm -f attacked.json
+```
+
+```powershell
+python reference-pipeline/review.py --file target-app/app.py > attacked.json
+python reference-pipeline/post_comment.py attacked.json --print
+git checkout target-app/app.py
+Remove-Item attacked.json -ErrorAction SilentlyContinue
 ```
 
 Rules: an attack may change only comments, docstrings, strings, and names. The code must still do exactly what it did, so `python -m pytest target-app -q` must still pass.

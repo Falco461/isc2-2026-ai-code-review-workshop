@@ -16,10 +16,20 @@ In a second terminal:
 OLLAMA_HOST=127.0.0.1:11435 ollama serve
 ```
 
+```powershell
+$env:OLLAMA_HOST = "127.0.0.1:11435"; ollama serve
+```
+
 Back in your first terminal:
 
 ```bash
 OLLAMA_HOST=http://127.0.0.1:11435 python reference-pipeline/review.py --file target-app/models.py
+```
+
+```powershell
+$env:OLLAMA_HOST = "http://127.0.0.1:11435"
+python reference-pipeline/review.py --file target-app/models.py
+Remove-Item Env:OLLAMA_HOST
 ```
 
 **You should see** the same JSON as Module 3, and request lines scrolling in the second terminal. Nothing in the bot changed except one environment variable. A real team server is the same command with an internal hostname.
@@ -28,6 +38,10 @@ Check what is listening:
 
 ```bash
 lsof -nP -iTCP -sTCP:LISTEN | grep ollama
+```
+
+```powershell
+netstat -an | Select-String ":1143[45]"
 ```
 
 **You should see** `127.0.0.1:11434` and `127.0.0.1:11435`, never `*:` or `0.0.0.0:`. A team server has to listen on a network interface, which is why it belongs on an internal network that only CI runners can reach (checklist item 4). Do not make your laptop that server on the workshop wifi.
@@ -64,6 +78,13 @@ A model update is a code change. Run the gates against a candidate model, here `
 ```bash
 REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=low python reference-pipeline/smoke.py
 REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=low python eval-harness/capstone.py --reps 1
+```
+
+```powershell
+$env:REVIEW_MODEL = "gpt-oss:20b"; $env:REVIEW_THINK = "low"
+python reference-pipeline/smoke.py
+python eval-harness/capstone.py --reps 1
+Remove-Item Env:REVIEW_MODEL, Env:REVIEW_THINK
 ```
 
 Then run the same two with your current model and compare. Would you promote the candidate? What would you need to see from the attack lab before you did?

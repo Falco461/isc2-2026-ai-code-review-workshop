@@ -17,12 +17,25 @@ REVIEW_SANITIZE=1 python reference-pipeline/review.py --file target-app/app.py -
   | python -c "import json,sys; print(json.load(sys.stdin)['prompts'][0]['user'])" | head -22
 ```
 
+```powershell
+$show = "import json,sys; print(json.load(sys.stdin)['prompts'][0]['user'])"
+python reference-pipeline/review.py --file target-app/app.py --dry-run | python -c $show | Select-Object -First 22
+$env:REVIEW_SANITIZE = "1"
+python reference-pipeline/review.py --file target-app/app.py --dry-run | python -c $show | Select-Object -First 22
+Remove-Item Env:REVIEW_SANITIZE
+```
+
 **You should see** the docstring at the top of `app.py` replaced with `"""[docstring removed by the review bot]"""`, and every code line still at the same line number.
 
 Now re-run the attacks with sanitizing on:
 
 ```bash
 REVIEW_SANITIZE=1 python attack-lab/run_attack.py --reps 3
+```
+
+```powershell
+$env:REVIEW_SANITIZE = "1"; python attack-lab/run_attack.py --reps 3
+Remove-Item Env:REVIEW_SANITIZE
 ```
 
 **What we measured** with `qwen3.5:9b`, three runs each:
@@ -49,6 +62,16 @@ python post_comment.py after.json --print
 cd ..
 ```
 
+```powershell
+cd reference-pipeline
+python review.py --file ../target-app > before.json
+$env:REVIEW_SANITIZE = "1"; python review.py --file ../target-app > after.json
+Remove-Item Env:REVIEW_SANITIZE
+python post_comment.py before.json --print
+python post_comment.py after.json --print
+cd ..
+```
+
 **What we measured:** every real bug stayed high in 3 of 3 runs. One side effect: with the docstring gone, the scanner hit on `auth.py` line 55 was widened to cover line 56 and reported the universal password a second time. A duplicate, not a false positive. Is a duplicate comment acceptable to your developers?
 
 ## 3. Audit logging
@@ -57,6 +80,13 @@ Turn it on and run one review:
 
 ```bash
 REVIEW_AUDIT_LOG=audit.jsonl REVIEW_SANITIZE=1 python reference-pipeline/review.py --file target-app/app.py
+python -c "import json; [print(r['time'], r['model'], r['prompt_sha256'][:16], r['answer'][:60].replace(chr(10),' ')) for r in map(json.loads, open('audit.jsonl'))]"
+```
+
+```powershell
+$env:REVIEW_AUDIT_LOG = "audit.jsonl"; $env:REVIEW_SANITIZE = "1"
+python reference-pipeline/review.py --file target-app/app.py
+Remove-Item Env:REVIEW_AUDIT_LOG, Env:REVIEW_SANITIZE
 python -c "import json; [print(r['time'], r['model'], r['prompt_sha256'][:16], r['answer'][:60].replace(chr(10),' ')) for r in map(json.loads, open('audit.jsonl'))]"
 ```
 
@@ -70,6 +100,10 @@ Check where your model is listening:
 
 ```bash
 lsof -nP -iTCP:11434 -sTCP:LISTEN
+```
+
+```powershell
+netstat -an | Select-String ":11434"
 ```
 
 **You should see** `127.0.0.1:11434`: this laptop only. If you see `*:11434`, anyone on the room Wi-Fi can use your model. Find out why before you go on.
