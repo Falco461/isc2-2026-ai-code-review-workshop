@@ -118,30 +118,77 @@ cd ..
 
 ## Going further: the prompt tournament
 
-About 45 to 60 minutes, as tables. The scoring tool is the one Module 8 uses.
+About 45 to 60 minutes, in pairs or tables. **The bugs are already planted. Your job is to make the bot find more of them, without adding noise.**
 
-Your bot's behavior is mostly the prompt in `prompts/review_system.md`. Change it, and score the result against the six planted bugs:
+### The goal
+
+Beat **36 points**, the score of the unchanged prompt. The scorer gives **10 points per planted bug found, minus 2 for every finding that matches no planted bug.** A prompt that finds everything by reporting everything loses.
+
+The unchanged bot finds 4 of the 6 planted bugs. The two it misses are **path traversal** and **broken access control**. No scanner flags either, so the bot can only find them in its cold read of the code.
+
+### What to edit
+
+Open `prompts/review_system.md` and edit **only the `## sweep` section**. That is the prompt for the cold read. The `## triage` section only ever sees what the scanners flagged, so it cannot win you the two missing bugs.
+
+Rules:
+
+1. Edit only `prompts/review_system.md`. No code changes.
+2. **Teach the bot how to look, not what to find.** Never name the planted bugs, the files, the functions, or line numbers. A prompt that only works on this app is not a better prompt.
+3. Keep the headings (`## triage`, `## sweep`, `## repo_read`): `review.py` loads each section by its heading.
+
+### 1. Save the original, and score the baseline once
 
 ```bash
 cp prompts/review_system.md prompts/review_system.md.orig
-# edit prompts/review_system.md
 python reference-pipeline/review.py --file target-app > scanner.json
 python reference-pipeline/review.py --file target-app --no-scanner > sweep.json
 python eval-harness/score_planted.py scanner.json sweep.json
 ```
 
-The scorer prints which planted bugs were found, every finding that matched no planted bug, and a score: **10 points per planted bug found, minus 2 per unmatched finding**. Noise costs you.
+```powershell
+Copy-Item prompts\review_system.md prompts\review_system.md.orig
+python reference-pipeline/review.py --file target-app > scanner.json
+python reference-pipeline/review.py --file target-app --no-scanner > sweep.json
+python eval-harness/score_planted.py scanner.json sweep.json
+```
 
-Rules:
+You only need `scanner.json` once: it does not change when you edit the `## sweep` section.
 
-1. Edit only `prompts/review_system.md`. No code changes.
-2. Do not name the planted bugs or their lines in the prompt. A prompt that only works on this app is not a better prompt.
-3. Keep the section headings: `review.py` loads each section by its heading.
-4. Post your best score and one sentence on what you changed.
+### 2. Edit, then test fast on one file
 
-The unchanged prompt scored 36 points on the instructor's laptop (4 of 6 planted bugs, 2 unmatched findings), the same in two runs on October 23. Path traversal and broken access control are the bugs to win. A full scored run takes about 2 minutes on a fast laptop; on Codespaces it takes about 40, so pair with a laptop.
+A full sweep takes about 2 minutes. While you experiment, review only `app.py`, in about 10 seconds (about a minute on a laptop without a GPU). It is where requests come in, so it is where the bot can see untrusted input meet something dangerous:
 
-When you are done, put the original prompt back. Module 4 pushes the repository, and you want the original in CI:
+```bash
+python reference-pipeline/review.py --file target-app/app.py --no-scanner
+```
+
+The command is the same in PowerShell. Look for a new finding, and check that the bot did not add junk.
+
+**What we saw:** adding the "follow the input" hint below to the `## sweep` section turned up path traversal on `app.py` in 2 of 2 runs, where the unchanged prompt missed it. Broken access control is the hard one: the proof is in another file, and the bot reviews one file at a time. Module 8 gives it a tool for exactly that. If your table gets it from the prompt alone, you have won.
+
+### 3. Score the real thing
+
+When a change looks good, rerun the full sweep and score it:
+
+```bash
+python reference-pipeline/review.py --file target-app --no-scanner > sweep.json
+python eval-harness/score_planted.py scanner.json sweep.json
+```
+
+The commands are the same in PowerShell. Put your best score on the board, with one sentence on what you changed. The model is not perfectly repeatable, so run your best prompt twice before you claim the win.
+
+### Hints, if you are stuck
+
+These are techniques a human reviewer uses. Turn one into an instruction:
+
+- **Follow the input.** For every value that comes from a request (query string, form field, URL path), follow it to where it is used: a SQL query, a shell command, a file path. Report the line where untrusted input reaches something dangerous.
+- **File paths built from input.** When code joins a folder and a name that came from a request, ask: what happens if the name contains `..`?
+- **Names are promises, code is proof.** A function or decorator whose name promises a check is only as good as what it actually checks. Compare the name with the code. If it promises more than it checks, that is a finding.
+- **Cut the noise.** Look at the scorer's unmatched findings. Tell the bot what is *not* worth reporting, without telling it to ignore real defects.
+
+### When you are done
+
+Put the original prompt back, so later modules and your CI use it:
 
 ```bash
 mv prompts/review_system.md.orig prompts/review_system.md

@@ -194,15 +194,29 @@ Get-Content ..\target-app\PLANTED.md
 cd ..
 ```
 
-**Going further: the prompt tournament**
+**1. Save the original, and score the baseline once**
 
 ```powershell
-cp prompts/review_system.md prompts/review_system.md.orig
-# edit prompts/review_system.md
+Copy-Item prompts\review_system.md prompts\review_system.md.orig
 python reference-pipeline/review.py --file target-app > scanner.json
 python reference-pipeline/review.py --file target-app --no-scanner > sweep.json
 python eval-harness/score_planted.py scanner.json sweep.json
 ```
+
+**2. Edit, then test fast on one file**
+
+```powershell
+python reference-pipeline/review.py --file target-app/app.py --no-scanner
+```
+
+**3. Score the real thing**
+
+```powershell
+python reference-pipeline/review.py --file target-app --no-scanner > sweep.json
+python eval-harness/score_planted.py scanner.json sweep.json
+```
+
+**When you are done**
 
 ```powershell
 Move-Item -Force prompts\review_system.md.orig prompts\review_system.md
