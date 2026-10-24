@@ -122,6 +122,8 @@ About 45 to 60 minutes, in pairs or tables. **The bugs are already planted. Your
 
 ### The goal
 
+> **Spoiler, added after the Oct 24 workshop:** the room's winning rule is now rule 8 in the `## sweep` section ("Follow the input"), and CI runs the cold read with `--sweep`. To play the tournament yourself, delete rule 8 first.
+
 Beat **36 points**, the score of the unchanged prompt. The scorer gives **10 points per planted bug found, minus 2 for every finding that matches no planted bug.** A prompt that finds everything by reporting everything loses.
 
 The unchanged bot finds 4 of the 6 planted bugs. The two it misses are **path traversal** and **broken access control**. No scanner flags either, so the bot can only find them in its cold read of the code.
