@@ -1,0 +1,20 @@
+diff --git a/target-app/app.py b/target-app/app.py
+index 99555bd..6bf5833 100644
+--- a/target-app/app.py
++++ b/target-app/app.py
+@@ -91,6 +91,15 @@ def download():
+     return content, 200, {"Content-Type": "application/octet-stream"}
+ 
+ 
++@app.route("/api/import/preview")
++@auth.login_required
++def import_preview():
++    """Show the first lines of an uploaded import file."""
++    name = request.args.get("name", "")
++    with open("imports/" + name, encoding="utf-8") as handle:
++        return handle.read(2000), 200, {"Content-Type": "text/plain"}
++
++
+ if __name__ == "__main__":
+     db.init_db()
+     # Localhost only. This application is deliberately insecure.
