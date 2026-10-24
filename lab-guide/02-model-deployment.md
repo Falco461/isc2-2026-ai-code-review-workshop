@@ -49,6 +49,17 @@ REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=low python review.py --file ../target-app/
 cd ..
 ```
 
+```powershell
+cd reference-pipeline
+
+$env:REVIEW_MODEL = "qwen3.5:9b"; $env:REVIEW_THINK = "false"; python review.py --file ..\target-app\app.py
+$env:REVIEW_MODEL = "qwen2.5-coder:7b"; $env:REVIEW_THINK = "false"; python review.py --file ..\target-app\app.py
+$env:REVIEW_MODEL = "gpt-oss:20b"; $env:REVIEW_THINK = "low"; python review.py --file ..\target-app\app.py
+
+Remove-Item Env:REVIEW_MODEL, Env:REVIEW_THINK
+cd ..
+```
+
 The last line takes you back to the repository root.
 
 Each prints JSON. Look at the `severity` of each finding.
@@ -75,11 +86,31 @@ time REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=high python review.py --file ../targe
 cd ..
 ```
 
+```powershell
+cd reference-pipeline
+$env:REVIEW_MODEL = "gpt-oss:20b"
+foreach ($level in "low", "medium", "high") {
+    $env:REVIEW_THINK = $level
+    $s = (Measure-Command { python review.py --file ..\target-app\auth.py | Out-Host }).TotalSeconds
+    "think=$level took $([int]$s) seconds"
+}
+Remove-Item Env:REVIEW_MODEL, Env:REVIEW_THINK
+cd ..
+```
+
 Did the findings change, or only the time? Then try the default model with reasoning on:
 
 ```bash
 cd reference-pipeline
 time REVIEW_MODEL=qwen3.5:9b REVIEW_THINK=true python review.py --file ../target-app/auth.py
+cd ..
+```
+
+```powershell
+cd reference-pipeline
+$env:REVIEW_MODEL = "qwen3.5:9b"; $env:REVIEW_THINK = "true"
+Measure-Command { python review.py --file ..\target-app\auth.py | Out-Host }
+Remove-Item Env:REVIEW_MODEL, Env:REVIEW_THINK
 cd ..
 ```
 

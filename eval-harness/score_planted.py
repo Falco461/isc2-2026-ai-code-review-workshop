@@ -22,6 +22,7 @@ import argparse
 import json
 import re
 import sys
+from pathlib import Path
 
 ACCESS_WORDS = re.compile(
     r"author|owner|ownership|idor|bola|another user|other user|any user|any order|access control", re.I
@@ -50,12 +51,25 @@ PLANTED = [
 ]
 
 
+
+def read_input_text(path):
+    """Read a file another tool wrote, whatever its encoding.
+
+    Windows PowerShell 5.1 writes `>` redirects as UTF-16 with a byte order
+    mark, and some editors add a UTF-8 one. Both are decoded here, so a
+    findings file or diff made on any platform reads the same way.
+    """
+    data = Path(path).read_bytes()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return data.decode("utf-16")
+    return data.decode("utf-8-sig")
+
+
 def load(paths):
     findings = []
     for path in paths:
         try:
-            with open(path, encoding="utf-8") as handle:
-                findings += json.load(handle)["findings"]
+            findings += json.loads(read_input_text(path))["findings"]
         except (OSError, ValueError, KeyError) as exc:
             sys.exit("score_planted: cannot read findings from %s: %s" % (path, exc))
     return findings

@@ -12,7 +12,10 @@
 #   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 #
 
-$ErrorActionPreference = "Stop"
+# Continue, not Stop: in Windows PowerShell 5.1, Stop turns any stderr line
+# from a native command (a pip notice, say) into a fatal error. Every step
+# below checks $LASTEXITCODE itself and calls Die on failure.
+$ErrorActionPreference = "Continue"
 
 $ScriptDir    = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot     = Split-Path -Parent $ScriptDir
@@ -115,8 +118,7 @@ if ($LASTEXITCODE -ne 0) {
 Ollama is not answering at $OllamaHost.
      Start it from the Start Menu, or run:  ollama serve
      If you do not have it, install it from https://ollama.com/download
-     To use the instructor-hosted model instead:
-       `$env:OLLAMA_HOST = "http://<address-given-in-room>:11434"
+     (Windows installer), then open a new PowerShell window.
 "@
 }
 
@@ -136,9 +138,9 @@ if ($LASTEXITCODE -eq 0) {
     $isLocal = $OllamaHost -eq "http://127.0.0.1:11434" -or $OllamaHost -eq "http://localhost:11434"
     if (-not $isLocal) {
         Die @"
-that host is remote, so this script will not pull to it.
-     Ask the instructor which model name the hosted server provides, then:
-       `$env:REVIEW_MODEL = "<that name>"
+that host is not this computer, so this script will not pull to it.
+     Pull the model on that machine, or clear OLLAMA_HOST to use your own:
+       Remove-Item Env:OLLAMA_HOST
 "@
     }
 
@@ -180,9 +182,10 @@ Activate the environment in this shell with:
 
   .\.venv\Scripts\Activate.ps1
 
-Then review the vulnerable app with:
+Then review the vulnerable app, from the repository root, with:
 
-  cd reference-pipeline
-  python review.py --file ..\target-app
+  python reference-pipeline\review.py --file target-app
+
+The lab guides are in lab-guide\. Start with 01-landscape.md.
 
 "@

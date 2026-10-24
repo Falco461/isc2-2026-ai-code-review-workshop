@@ -111,3 +111,23 @@ def test_tournament_points_reward_bugs_and_charge_for_noise():
         finding("target-app/app.py", 3, "Something unrelated"),
     ])
     assert score_planted.points(results, extras) == 10 - 2
+
+
+def test_findings_written_by_windows_powershell_still_load(tmp_path):
+    """Windows PowerShell 5.1 writes `>` redirects as UTF-16 with a byte order mark."""
+    body = '{"findings": [{"file": "target-app/models.py", "line_start": 59, "line_end": 59, "title": "SQLi", "severity": "high"}]}'
+    utf16, bom8 = tmp_path / "ps51.json", tmp_path / "bom.json"
+    utf16.write_bytes(body.encode("utf-16"))
+    bom8.write_bytes(body.encode("utf-8-sig"))
+    assert len(score_planted.load([str(utf16), str(bom8)])) == 2
+
+
+def test_review_and_post_comment_read_utf16_files(tmp_path):
+    sys.path.insert(0, str(REPO_ROOT / "reference-pipeline"))
+    import post_comment
+    import review
+    text = "diff --git a/x b/x\n+line\n"
+    f = tmp_path / "pr.diff"
+    f.write_bytes(text.encode("utf-16"))
+    assert review.read_input_text(f) == text
+    assert post_comment.read_input_text(f) == text

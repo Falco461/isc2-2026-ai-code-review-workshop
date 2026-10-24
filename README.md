@@ -84,9 +84,9 @@ Any one of these:
 
 - macOS 13 Ventura or newer, Apple Silicon or Intel. Apple Silicon is the smoothest path.
 - Linux, Ubuntu 22.04 or newer or equivalent.
-- **Windows, or any laptop you cannot install software on:** use a GitHub Codespace in your browser instead. It is a Linux machine with everything preinstalled, and it needs only a free GitHub account. It has no GPU, so reviews are slower: about 1 to 2 minutes per file. See `lab-guide/00-setup.md`.
+- **Windows:** PowerShell works (Path C in `lab-guide/00-setup.md`), and so does WSL with Ubuntu (Path A).
+- **Any laptop you cannot install software on:** use a GitHub Codespace in your browser instead. It is a Linux machine with everything preinstalled, and it needs only a free GitHub account. It has no GPU, so reviews are slower: about 1 to 2 minutes per file. See `lab-guide/00-setup.md`.
 
-Native Windows is not supported in the room.
 
 ### Software
 
