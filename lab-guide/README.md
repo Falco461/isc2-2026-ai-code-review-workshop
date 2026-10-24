@@ -33,7 +33,13 @@ cd isc2-2026-ai-code-review-workshop
 source .venv/bin/activate
 ```
 
-The guides use macOS and Linux commands. On Windows, use the GitHub Codespace described in [00-setup.md](00-setup.md), which is Linux.
+```powershell
+cd isc2-2026-ai-code-review-workshop
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+The guides use macOS and Linux (`bash`) commands, with `powershell` blocks where Windows differs. Windows users: see "Reading the guides on Windows" in [00-setup.md](00-setup.md). In a Codespace, every `bash` command works as written.
 
 ## Answer key
 

@@ -149,6 +149,19 @@ def parse_think(value):
     )
 
 
+
+def read_input_text(path):
+    """Read a file another tool wrote, whatever its encoding.
+
+    Windows PowerShell 5.1 writes `>` redirects as UTF-16 with a byte order
+    mark, and some editors add a UTF-8 one. Both are decoded here, so a
+    findings file or diff made on any platform reads the same way.
+    """
+    data = Path(path).read_bytes()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return data.decode("utf-16")
+    return data.decode("utf-8-sig")
+
 def load_config(path=CONFIG_PATH):
     """Read config.toml and apply environment overrides."""
     if not path.is_file():
@@ -936,7 +949,7 @@ def resolve_targets(args, config):
             fail("no such file or directory: %s" % args.file)
         return [path], None
 
-    diff_text = read_staged_diff() if args.staged else Path(args.diff).read_text(encoding="utf-8")
+    diff_text = read_staged_diff() if args.staged else read_input_text(args.diff)
     changed = parse_unified_diff(diff_text)
     files = []
     for name in changed:
@@ -979,7 +992,7 @@ def main(argv=None):
             if not sarif_path.is_file():
                 fail("no such SARIF file: %s" % args.sarif)
             try:
-                scanner_findings = parse_sarif(json.loads(sarif_path.read_text(encoding="utf-8")))
+                scanner_findings = parse_sarif(json.loads(read_input_text(sarif_path)))
             except json.JSONDecodeError:
                 fail("%s is not valid JSON. Expected a SARIF 2.1.0 document." % args.sarif)
             for finding in scanner_findings:

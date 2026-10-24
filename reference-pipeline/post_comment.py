@@ -187,6 +187,20 @@ def post(target, body):
 # ------------------------------------------------------------------- cli
 
 
+
+def read_input_text(path):
+    """Read a file another tool wrote, whatever its encoding.
+
+    Windows PowerShell 5.1 writes `>` redirects as UTF-16 with a byte order
+    mark, and some editors add a UTF-8 one. Both are decoded here, so a
+    findings file or diff made on any platform reads the same way.
+    """
+    data = Path(path).read_bytes()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return data.decode("utf-16")
+    return data.decode("utf-8-sig")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Post review.py findings as a PR or MR comment.")
     parser.add_argument("findings", help="JSON file written by review.py")
@@ -196,7 +210,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     try:
-        document = json.loads(Path(args.findings).read_text(encoding="utf-8"))
+        document = json.loads(read_input_text(args.findings))
     except (OSError, ValueError) as error:
         warn("could not read %s: %s. Did review.py run?" % (args.findings, error))
         return 1 if args.strict else 0
