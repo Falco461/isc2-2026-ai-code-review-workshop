@@ -25,7 +25,7 @@ python -m json.tool findings.json
 ```
 
 ```powershell
-Get-Content findings.json | python -m json.tool
+Get-Content findings.json -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 10
 ```
 
 Every finding has a `file`, a `line_start`, the exact source line in `evidence`, a `severity`, and an `explanation`. **You should see about 8 findings, some of them marked `info`.**

@@ -962,6 +962,10 @@ def resolve_targets(args, config):
 
 
 def main(argv=None):
+    # Windows writes redirected output in its legacy code page, which has no
+    # emoji and no typographic dashes. UTF-8 everywhere instead.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     args = build_parser().parse_args(argv)
     config = load_config()
     prompts = load_prompts()

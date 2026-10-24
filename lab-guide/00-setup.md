@@ -146,7 +146,7 @@ The guides show `bash` commands. Most work in PowerShell as written (`python`, `
 | `less file` | `Get-Content file` |
 | `python3` | `python` |
 
-Saving output with `>` works: the tools read the files Windows PowerShell writes.
+Saving output with `>` works: the tools read the files Windows PowerShell writes. Do not pipe text into `python` (`something | python ...`): Windows PowerShell 5.1 garbles it on the way in, and Python fails with `Expecting value: line 1 column 1`. The PowerShell blocks in the guides never do it; use them instead of translating a `bash` pipe yourself.
 
 ## Path B: GitHub Codespaces
 

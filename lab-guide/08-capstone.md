@@ -40,6 +40,12 @@ Run it with GPT-OSS if your laptop can:
 REVIEW_MODEL=gpt-oss:20b REVIEW_THINK=low python eval-harness/capstone.py
 ```
 
+```powershell
+$env:REVIEW_MODEL = "gpt-oss:20b"; $env:REVIEW_THINK = "low"
+python eval-harness/capstone.py
+Remove-Item Env:REVIEW_MODEL, Env:REVIEW_THINK
+```
+
 On Codespaces or a CPU-only laptop, use `--reps 1`.
 
 ## 3. Watch the tool work
@@ -57,6 +63,13 @@ REVIEW_AUDIT_LOG=audit-capstone.jsonl python reference-pipeline/review.py --diff
 python -c "import json; [print('read', r['user_prompt']) for r in map(json.loads, open('audit-capstone.jsonl')) if '\\n' not in r['user_prompt']]"
 ```
 
+```powershell
+$env:REVIEW_AUDIT_LOG = "audit-capstone.jsonl"
+python reference-pipeline/review.py --diff pr.diff --no-scanner --repo-read
+Remove-Item Env:REVIEW_AUDIT_LOG
+python eval-harness/show_reads.py audit-capstone.jsonl
+```
+
 **You should see** reads like `target-app/auth.py: require_order_access` and `target-app/models.py: get_order`, and a finding such as "Broken Access Control: User can access any order via IDOR vulnerability" on the endpoint.
 
 Now the same diff without repo-read:
@@ -72,6 +85,11 @@ Put your checkout back:
 ```bash
 git checkout target-app/app.py
 rm -f pr.diff audit-capstone.jsonl
+```
+
+```powershell
+git checkout target-app/app.py
+Remove-Item pr.diff, audit-capstone.jsonl -ErrorAction SilentlyContinue
 ```
 
 ## 4. What the tool is allowed to do
@@ -94,6 +112,10 @@ cfg = review.load_config(); scope = review.repo_scope('target-app/app.py')
 for f, s in [('target-app/../reference-pipeline/review.py', 'main'), ('target-app/tests/conftest.py', 'login'), ('target-app/auth.py', 'nope')]:
     print(review.read_symbol({'file': f, 'symbol': s}, scope, cfg)[1])
 "
+```
+
+```powershell
+python eval-harness/try_read_limits.py
 ```
 
 **You should see** two refusals and a "not found."
@@ -119,6 +141,14 @@ REVIEW_SANITIZE=1 python reference-pipeline/review.py --file target-app --no-sca
 python eval-harness/score_planted.py scanner.json sweep.json
 ```
 
+```powershell
+$env:REVIEW_SANITIZE = "1"
+python reference-pipeline/review.py --file target-app > scanner.json
+python reference-pipeline/review.py --file target-app --no-scanner --repo-read > sweep.json
+Remove-Item Env:REVIEW_SANITIZE
+python eval-harness/score_planted.py scanner.json sweep.json
+```
+
 The scorer pools both files, lists each planted bug as found or missed, and lists every finding that matched no planted bug. Some of those are real extra issues, some are noise. Deciding which is the exercise. Then run the same two reviews without `REVIEW_SANITIZE=1` and compare.
 
 **What we measured** with `qwen3.5:9b`, three runs each, October 17, 2026:
@@ -140,6 +170,10 @@ Clean up when you are done:
 
 ```bash
 rm -f scanner.json sweep.json
+```
+
+```powershell
+Remove-Item scanner.json, sweep.json -ErrorAction SilentlyContinue
 ```
 
 ## 7. Plant a bug for your neighbour
@@ -176,6 +210,12 @@ Clean up afterwards:
 git checkout main
 git branch -D planted
 rm -f mine.diff
+```
+
+```powershell
+git checkout main
+git branch -D planted
+Remove-Item mine.diff -ErrorAction SilentlyContinue
 ```
 
 Want to see it land in a real pull request? Push the branch to the repository you made in Module 4 and open a pull request. The bot comments in about 8 minutes.

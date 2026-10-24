@@ -33,6 +33,12 @@ Bandit rates its own findings. Get its ratings and compare them with your guesse
 bandit -q -r target-app -x target-app/tests -f json | python -c "import json,sys; [print(r['issue_severity'], r['issue_confidence'], r['filename'], r['line_number'], r['test_id']) for r in json.load(sys.stdin)['results']]"
 ```
 
+```powershell
+bandit -q -r target-app -x target-app/tests -f json > bandit.json
+(Get-Content bandit.json -Raw | ConvertFrom-Json).results | ForEach-Object { "$($_.issue_severity) $($_.issue_confidence) $($_.filename) $($_.line_number) $($_.test_id)" }
+Remove-Item bandit.json
+```
+
 Where did Bandit rate something higher or lower than you did? Which of its ratings would you trust in a pull request comment?
 
 ### Map your own pipeline

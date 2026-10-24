@@ -177,6 +177,10 @@ def check_dry_run(document):
 
 
 def main(argv=None):
+    # Windows writes redirected output in its legacy code page, which has no
+    # emoji and no typographic dashes. UTF-8 everywhere instead.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="smoke.py", description=__doc__)
     parser.add_argument(
         "--dry-run",

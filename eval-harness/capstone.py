@@ -118,6 +118,10 @@ def run_once(flags):
 
 
 def main(argv=None):
+    # Windows writes redirected output in its legacy code page, which has no
+    # emoji and no typographic dashes. UTF-8 everywhere instead.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Score the Module 8 capstone.")
     parser.add_argument("--reps", type=int, default=3)
     parser.add_argument("--json", action="store_true")
