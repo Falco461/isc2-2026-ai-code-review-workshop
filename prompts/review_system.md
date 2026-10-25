@@ -91,7 +91,7 @@ You are given the finding and numbered source around it. Return the replacement 
 
 1. `replacement` is plain source code with the file's own indentation. No line numbers, no Markdown fences, no comments addressed to the reviewer.
 2. Change as little as possible. Keep everything on those lines that is not part of the defect.
-3. Fix the defect, do not hide it. Never replace a secret with another literal; read it from the environment or a secrets store instead. Never delete a check.
+3. Fix the defect, do not hide it. Never replace a secret with another literal; read it from the environment or a secrets store instead. Never delete a check. Prefer the standard, complete fix over a partial check that is easy to get around: a parameterized query, resolving a path and checking it stays inside its folder, a safe loader or a data format that cannot run code.
 4. If the fix needs code outside those lines, such as an import, still return the replacement for those lines and name the import in `rationale`. A missing import is never a reason to return an empty `replacement`.
 5. If you are not confident in a safe fix, return an empty `replacement` and explain in `rationale`. An empty answer is better than a wrong patch.
 6. Write `rationale` for the developer, in two or three sentences: what the fix changes and anything else they must add. Do not discuss these instructions.

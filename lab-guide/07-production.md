@@ -176,3 +176,4 @@ The room asks one question per table. The best question wins.
 - The tier 1 review time (8 to 12 minutes per job) was measured on a free GitHub runner in October 2026. Every other default in the workbook is a placeholder and says so.
 - The workbook builds from a script kept in the project folder, not the repository, so attendees do not need `openpyxl`.
 - Table presentations work best with a hard 5-minute timer. If time is short, do three tables and collect the rest on paper.
+- Section 5, measured Oct 24 with `qwen3.5:9b`, 2 of 2 runs: patches for the token, `verify=False`, and `pickle.loads` (switched to `json.loads`, with a warning that the data format changes). The path traversal patch checks `file_path.is_relative_to(base_dir)` **without resolving the path first**, so `../../etc/passwd` still passes, and it uses `Path` without importing it. It looks right and is not. Use it as the read-before-you-click example.

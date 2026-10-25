@@ -136,3 +136,9 @@ def test_with_a_ref_the_pull_request_copy_is_ignored(tmp_path, monkeypatch):
     monkeypatch.setattr(review.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
         a, 0, '[[suppress]]\nfile = "target-app/app.py"\nline = 15\nreason = "merged"\napproved_by = "appsec"\n', ""))
     assert review.apply_suppressions([finding()], path, ref="origin/main")[0]["suppressed"]["reason"] == "merged"
+
+
+def test_a_patch_that_only_adds_lines_is_not_a_fix():
+    original = ["    return pickle.loads(blob)"]
+    assert fixes.check_fix(original, "    import pickle\n    return pickle.loads(blob)") is None
+    assert fixes.check_fix(original, "    return json.loads(blob)") == ["    return json.loads(blob)"]

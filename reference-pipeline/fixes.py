@@ -52,6 +52,11 @@ def check_fix(original, replacement):
         return None
     if [l.rstrip() for l in new] == [l.rstrip() for l in original]:
         return None
+    # A patch that keeps every original line exactly, and only adds lines
+    # around them, has not changed the defect. Re-indenting counts as a change.
+    kept = {l.rstrip() for l in new}
+    if all(l.rstrip() in kept for l in original if l.strip()):
+        return None
     return new
 
 
