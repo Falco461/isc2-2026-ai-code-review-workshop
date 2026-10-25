@@ -80,4 +80,4 @@ jobs:
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: .venv/bin/python reference-pipeline/post_comment.py findings.json
+        run: .venv/bin/python reference-pipeline/post_comment.py findings.json --suggest --diff pr.diff
