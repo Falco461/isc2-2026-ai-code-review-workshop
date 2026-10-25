@@ -73,11 +73,12 @@ jobs:
       - name: Review the changed lines
         run: |
           git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
-          .venv/bin/python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
+          # Bypasses count only once merged: read them from the target branch.
+          REVIEW_SUPPRESSIONS_REF="origin/${{ github.base_ref }}" .venv/bin/python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
           cat findings.json
 
       - name: Post the review on the pull request
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: .venv/bin/python reference-pipeline/post_comment.py findings.json
+        run: .venv/bin/python reference-pipeline/post_comment.py findings.json --suggest --diff pr.diff

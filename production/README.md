@@ -70,6 +70,15 @@ The audit log already holds what you need. Count these per week:
 | Repo-read requests and refusals | audit records whose prompt is a short `file: symbol` request, and answers starting `refused:` | reads unrelated to the diff, or refusals, are what a prompt injection steering the tool looks like; in Module 8 one steered the reads in 3 of 3 runs |
 | Comments with no findings | the comment body | healthy when the code is clean; suspicious if it suddenly rises |
 
+## Fixes and bypasses
+
+Developers act on a finding in one of two ways, and the bot supports both in the pull request itself, on GitHub and GitLab:
+
+- **Apply the fix.** `post_comment.py --suggest` posts a model-written fix on the finding's line, with the platform's one-click suggestion button. A person reviews it and applies it; nothing is committed automatically.
+- **Disagree, with a record.** A bypass is an entry in `security-suppressions.toml`: what, why, who approved it, and when it expires. In CI the bot reads the file from the target branch, so a bypass counts only after its own review. Suppressed findings stay in the comment, in their own table.
+
+Replying in the thread ("/dismiss") is the other common pattern. It needs a comment-triggered workflow on GitHub, which runs with write access and must never run the pull request's code, and a webhook service on GitLab. Module 7 walks through why suppressions as code reach the same outcome more safely.
+
 ## Cost
 
 Open [`tco-model.xlsx`](tco-model.xlsx). Change the yellow cells on the Inputs sheet. With its placeholder inputs (200 developers, 3 pull requests each a week), the three self-hosted tiers cost between about $30,000 and $95,000 over three years, and per-seat SaaS about $300,000. Developer time triaging findings, about $160,000 a year, is larger than any tool. A bot's precision is a cost line.

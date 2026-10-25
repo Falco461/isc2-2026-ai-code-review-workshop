@@ -410,6 +410,23 @@ python eval-harness/capstone.py --reps 1
 Remove-Item Env:REVIEW_MODEL, Env:REVIEW_THINK
 ```
 
+**Suggested fixes, one click**
+
+```powershell
+git switch add-order-importer
+git diff main > pr.diff
+python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
+python reference-pipeline/post_comment.py findings.json --print --suggest --diff pr.diff
+git switch main
+```
+
+**Bypasses, as code**
+
+```powershell
+python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
+python reference-pipeline/post_comment.py findings.json --print
+```
+
 ## 08. Capstone
 
 Full guide: [08-capstone.md](08-capstone.md)
