@@ -4,6 +4,18 @@ Day 2 starts on offense. The code under review is written by whoever opened the 
 
 All commands run from the repository root with the environment active.
 
+
+## Before you start: get today's bot
+
+Yesterday's fixes from the room (Windows support, the scanner check, the tournament's winning rule) are on GitHub. Get them, from the repository root. This works whether you cloned the instructor's repository or a fork:
+
+```bash
+git switch main
+git pull https://github.com/cameronhopkin/isc2-2026-ai-code-review-workshop.git main
+```
+
+The commands are the same in PowerShell. If git says your local changes would be overwritten, you still have an edited prompt from the tournament: run `git checkout prompts/review_system.md` and pull again.
+
 ## How the attack lab works
 
 ```bash

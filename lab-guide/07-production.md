@@ -103,17 +103,18 @@ A bot that only complains gets ignored. In production, developers need two more 
 
 For each finding on a line the pull request changed, the bot asks the model for a fix and posts it **on that line**, as a suggestion with the platform's own button: **Commit suggestion** on GitHub, **Apply suggestion** on GitLab. When the model is not confident it can fix something safely in place, the bot posts its advice without a button.
 
-See it locally first, on the Module 4 branch (`add-order-importer`):
+See it locally first, on the Module 4 branch (`add-order-importer`). Bring today's bot into the branch first (`git merge --no-edit main`), or the branch still has yesterday's code; then diff only what the branch changed (`main...HEAD`, three dots):
 
 ```bash
 git switch add-order-importer
-git diff main > pr.diff
+git merge --no-edit main
+git diff main...HEAD > pr.diff
 python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
 python reference-pipeline/post_comment.py findings.json --print --suggest --diff pr.diff
 git switch main
 ```
 
-The commands are the same in PowerShell. **You should see** the summary comment, then one block per finding: a suggested patch for the hardcoded token and for `verify=False`, and advice only for `pickle.loads`, where no safe one-click fix exists.
+The commands are the same in PowerShell. No `add-order-importer` branch? Make one: `git switch -c add-order-importer`, then `git apply ci-templates/lab/add-order-importer.patch`, `git add target-app/importer.py`, and `git commit -m "Add bulk order import"`. **You should see** the summary comment, then one block per finding: a suggested patch for the hardcoded token and for `verify=False`, and advice only for `pickle.loads`, where no safe one-click fix exists.
 
 Read the token fix closely. It reads the token from `os.environ`, and the file has no `import os`. The rationale says so; the button does not. **A one-click fix is still model-written code that read the attacker's code.** That is why nothing is committed until a person clicks, and why the suggestion says so.
 
@@ -134,14 +135,27 @@ expires = 2026-11-30
 
 `file`, a `reason`, and `approved_by` are required, plus either a `line` or a `match` (text on the finding's lines). `rule` (such as `B501`) and `expires` are optional. An entry missing any required part, or past its expiry, is ignored with a warning.
 
-Try it: save that file at the repository root, rerun the review and the comment, and look for the **Suppressed** table at the bottom. The finding is still shown, with the reason and who approved it. Then delete `approved_by` and run it again.
+On Windows, create it from PowerShell, so the encoding is right:
+
+```powershell
+Set-Content -Encoding ascii security-suppressions.toml @'
+[[suppress]]
+file = "target-app/importer.py"
+match = "verify=False"
+reason = "Partner feed is on the internal network. SEC-123 adds the CA bundle."
+approved_by = "appsec-oncall"
+expires = 2026-11-30
+'@
+```
+
+Try it: save that file at the repository root (on the `add-order-importer` branch, with `pr.diff` from above), rerun the review and the comment, and look for the **Suppressed** table at the bottom. The finding is still shown, with the reason and who approved it. Then delete `approved_by` and run it again.
 
 ```bash
 python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
 python reference-pipeline/post_comment.py findings.json --print
 ```
 
-The commands are the same in PowerShell. Delete `security-suppressions.toml` when you are done.
+The commands are the same in PowerShell. Delete `security-suppressions.toml` when you are done (`rm security-suppressions.toml`, or `Remove-Item security-suppressions.toml` in PowerShell).
 
 **In CI, a pull request cannot approve its own bypass.** The templates set `REVIEW_SUPPRESSIONS_REF` to the target branch, so the bot reads `security-suppressions.toml` from `main`, not from the pull request. A new bypass counts only after its own change has been reviewed and merged.
 
