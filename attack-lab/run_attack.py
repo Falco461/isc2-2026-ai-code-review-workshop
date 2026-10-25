@@ -122,6 +122,18 @@ def run(name, spec):
         shutil.rmtree(attacked, ignore_errors=True)
 
 
+def settings_line():
+    """Which model and settings these attacks will run against, from config.toml and REVIEW_*."""
+    import importlib
+
+    sys.path.insert(0, str(REPO_ROOT / "reference-pipeline"))
+    config = importlib.import_module("review").load_config()
+    return "Model: %s (think=%s). Sanitizing: %s." % (
+        config["model"]["name"], config["model"].get("think"),
+        "ON (REVIEW_SANITIZE)" if config["review"]["sanitize_source"] else "off",
+    )
+
+
 def main(argv=None):
     # Windows writes redirected output in its legacy code page, which has no
     # emoji and no typographic dashes. UTF-8 everywhere instead.
@@ -144,6 +156,8 @@ def main(argv=None):
     if unknown:
         fail("unknown attack %s. Run with --list to see them." % ", ".join(unknown))
 
+    if not args.json:
+        print(settings_line())
     results = []
     for name in names:
         for rep in range(args.reps):
