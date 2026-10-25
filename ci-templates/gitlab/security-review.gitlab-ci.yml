@@ -53,5 +53,8 @@ security-review:
     # Bypasses count only once merged: read them from the target branch.
     - REVIEW_SUPPRESSIONS_REF="origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" .venv/bin/python reference-pipeline/review.py --diff mr.diff --sweep > findings.json
     - cat findings.json
-  after_script:
+    # Summary, then one-click fixes. Here, not in after_script, which GitLab stops after 5 minutes.
     - .venv/bin/python reference-pipeline/post_comment.py findings.json --suggest --diff mr.diff
+  after_script:
+    # Fallback: if the review step failed, still update the summary comment.
+    - .venv/bin/python reference-pipeline/post_comment.py findings.json
