@@ -169,18 +169,31 @@ def read_input_text(path):
 SUPPRESSIONS_FILE = "security-suppressions.toml"
 
 
-def load_suppressions(path):
+def load_suppressions(path, ref=None):
     """Read approved bypasses. Each entry must say what, why, and who approved.
 
     The file is reviewed like any other code change; that review is the
     real control. approved_by is a record of the decision, not a login.
+
+    With ref (CI sets REVIEW_SUPPRESSIONS_REF to the target branch), the
+    file is read from that branch, not from the pull request, so a pull
+    request cannot approve a bypass of its own findings.
     """
     path = Path(path)
-    if not path.is_file():
-        return []
     try:
-        with path.open("rb") as handle:
-            entries = tomllib.load(handle).get("suppress", [])
+        if ref:
+            shown = subprocess.run(
+                ["git", "show", "%s:%s" % (ref, _relative(path))],
+                cwd=REPO_ROOT, capture_output=True, text=True,
+            )
+            if shown.returncode != 0:
+                return []
+            entries = tomllib.loads(shown.stdout).get("suppress", [])
+        else:
+            if not path.is_file():
+                return []
+            with path.open("rb") as handle:
+                entries = tomllib.load(handle).get("suppress", [])
     except (tomllib.TOMLDecodeError, OSError) as exc:
         warn("ignoring %s: %s" % (path.name, exc))
         return []
@@ -233,9 +246,9 @@ def suppression_for(finding, entries):
     return None
 
 
-def apply_suppressions(findings, path):
+def apply_suppressions(findings, path, ref=None):
     """Mark approved bypasses on the findings. Nothing is removed."""
-    entries = load_suppressions(path)
+    entries = load_suppressions(path, ref)
     for finding in findings:
         entry = suppression_for(finding, entries) if entries else None
         if entry:
@@ -1177,7 +1190,11 @@ def main(argv=None):
 
     severity_order = {name: index for index, name in enumerate(SEVERITIES)}
     findings.sort(key=lambda f: (severity_order.get(f["severity"], 99), f["file"], f["line_start"]))
-    apply_suppressions(findings, REPO_ROOT / config["review"].get("suppressions_file", SUPPRESSIONS_FILE))
+    apply_suppressions(
+        findings,
+        REPO_ROOT / config["review"].get("suppressions_file", SUPPRESSIONS_FILE),
+        os.environ.get("REVIEW_SUPPRESSIONS_REF") or None,
+    )
 
     no_findings_reason = None
     if not findings:

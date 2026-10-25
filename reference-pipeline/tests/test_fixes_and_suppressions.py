@@ -123,3 +123,16 @@ def test_post_suggestions_skips_fixes_already_posted(monkeypatch, tmp_path):
     fix = {"lines": ["x"], "rationale": ""}
     n = post_comment.post_suggestions("github", target, [(finding(), fix), (finding(line_start=17, line_end=17), fix)])
     assert n == 1 and posted[0]["line"] == 17 and posted[0]["commit_id"] == "abc"
+
+
+def test_with_a_ref_the_pull_request_copy_is_ignored(tmp_path, monkeypatch):
+    """CI reads suppressions from the target branch, so a PR cannot approve its own bypass."""
+    import subprocess
+
+    path = write(tmp_path, '[[suppress]]\nfile = "target-app/app.py"\nline = 15\nreason = "r"\napproved_by = "a"\n')
+    monkeypatch.setattr(review.subprocess, "run",
+                        lambda *a, **k: subprocess.CompletedProcess(a, 128, "", "fatal: path does not exist"))
+    assert "suppressed" not in review.apply_suppressions([finding()], path, ref="origin/main")[0]
+    monkeypatch.setattr(review.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
+        a, 0, '[[suppress]]\nfile = "target-app/app.py"\nline = 15\nreason = "merged"\napproved_by = "appsec"\n', ""))
+    assert review.apply_suppressions([finding()], path, ref="origin/main")[0]["suppressed"]["reason"] == "merged"

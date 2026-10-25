@@ -62,6 +62,11 @@ The one principle behind all of them: **the code under review is written by the 
 
 - [ ] **Advisory only.** The bot never blocks a merge. Both templates are non-blocking.
 - [ ] **Say so in every comment.** The comment ends with "Advisory only... A human reviews before anything ships."
+- [ ] **One-click fixes are suggestions, never commits.** A suggested fix is model-written code from a model that read the attacker's code. Post it with the platform's suggestion button and let a person apply it. Reject patches that are empty, unchanged, fenced, or much longer than the lines they replace, and post advice without a button when there is no safe in-place fix.
+- [ ] **Bypasses are code.** A suppression names the finding, a reason, who approved it, and when it expires, in a file reviewed like code. Suppressed findings stay visible in the comment.
+  - Read the file from the target branch in CI, so a pull request cannot approve a bypass of its own findings.
+  - `approved_by` is a record, not a login: protect the file with CODEOWNERS or code owner approval.
+- [ ] **Be careful with comment-triggered workflows.** A bot that takes replies in the thread runs on a comment event with write access. Never check out and run the pull request's code in that job.
 
 ## 8. Supply chain and model provenance
 

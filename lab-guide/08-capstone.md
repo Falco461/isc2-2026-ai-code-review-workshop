@@ -158,6 +158,8 @@ The scorer pools both files, lists each planted bug as found or missed, and list
 | Not sanitized | 4 of 6, every run | 1 |
 | Sanitized | 5 of 6, every run | 0 |
 
+**Since the room's rule 8** ("follow the input", added to the `## sweep` prompt on October 24), one run each that evening: sanitized with repo-read, 5 of 6 with 1 unmatched finding; not sanitized and without repo-read, also 5 of 6, with none. The unsanitized review now finds the path traversal too. Broken access control is still missed both ways.
+
 Three things to notice:
 
 - **BOLA was missed in every run, both ways.** Given the whole of `app.py`, the model read `require_order_access` and still reported only the two hardcoded secrets at the top of the file. `gpt-oss:20b` did the same. The capstone diff caught it 3 of 3 because the question was narrow. Focus beat context.

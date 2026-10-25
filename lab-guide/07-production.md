@@ -95,7 +95,63 @@ On Codespaces or a CPU-only laptop, run only the smoke test.
 
 The table in `production/README.md` lists six signals, all from the audit log, the CI job, or the comment. Pick the two you would put on a dashboard first, and the threshold that would page someone. Be ready to defend it in the group discussion.
 
-## 5. Table presentations
+## 5. Fixes and bypasses in the pull request
+
+A bot that only complains gets ignored. In production, developers need two more things from it: **a fix they can apply**, and **a way to disagree** that leaves a record. This section adds both, on GitHub and GitLab.
+
+### Suggested fixes, one click
+
+For each finding on a line the pull request changed, the bot asks the model for a fix and posts it **on that line**, as a suggestion with the platform's own button: **Commit suggestion** on GitHub, **Apply suggestion** on GitLab. When the model is not confident it can fix something safely in place, the bot posts its advice without a button.
+
+See it locally first, on the Module 4 branch (`add-order-importer`):
+
+```bash
+git switch add-order-importer
+git diff main > pr.diff
+python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
+python reference-pipeline/post_comment.py findings.json --print --suggest --diff pr.diff
+git switch main
+```
+
+The commands are the same in PowerShell. **You should see** the summary comment, then one block per finding: a suggested patch for the hardcoded token and for `verify=False`, and advice only for `pickle.loads`, where no safe one-click fix exists.
+
+Read the token fix closely. It reads the token from `os.environ`, and the file has no `import os`. The rationale says so; the button does not. **A one-click fix is still model-written code that read the attacker's code.** That is why nothing is committed until a person clicks, and why the suggestion says so.
+
+In CI, the templates already do this (`post_comment.py --suggest --diff pr.diff`). To get it on your Module 4 repository, copy the template again, push it to `main`, then push any commit to your pull request branch.
+
+### Bypasses, as code
+
+A developer who disagrees with a finding does not argue with the bot. They add an entry to `security-suppressions.toml` in the pull request, and that change gets reviewed like any other:
+
+```toml
+[[suppress]]
+file = "target-app/importer.py"
+match = "verify=False"
+reason = "Partner feed is on the internal network. SEC-123 adds the CA bundle."
+approved_by = "appsec-oncall"
+expires = 2026-11-30
+```
+
+`file`, a `reason`, and `approved_by` are required, plus either a `line` or a `match` (text on the finding's lines). `rule` (such as `B501`) and `expires` are optional. An entry missing any required part, or past its expiry, is ignored with a warning.
+
+Try it: save that file at the repository root, rerun the review and the comment, and look for the **Suppressed** table at the bottom. The finding is still shown, with the reason and who approved it. Then delete `approved_by` and run it again.
+
+```bash
+python reference-pipeline/review.py --diff pr.diff --sweep > findings.json
+python reference-pipeline/post_comment.py findings.json --print
+```
+
+The commands are the same in PowerShell. Delete `security-suppressions.toml` when you are done.
+
+**In CI, a pull request cannot approve its own bypass.** The templates set `REVIEW_SUPPRESSIONS_REF` to the target branch, so the bot reads `security-suppressions.toml` from `main`, not from the pull request. A new bypass counts only after its own change has been reviewed and merged.
+
+**`approved_by` is a record, not a login.** Anyone can type a name. The control is the review of the file itself: in production, protect `security-suppressions.toml` with CODEOWNERS (GitHub) or code owners approval (GitLab) so only the security team can approve changes to it.
+
+### What we did not build: replying in the thread
+
+A production bot can also take replies on its comment ("/dismiss, test fixture") and suggestions by button. On GitHub that means a workflow triggered by pull request comments, and comment-triggered workflows run with write access: if one ever checks out and runs the pull request's code, any commenter owns your repository. On GitLab, CI cannot trigger on a comment at all without a separate service listening for webhooks. Both are real patterns; both are work to do safely. Suppressions as code give you the same outcome, a reviewed and recorded bypass, with no new trigger.
+
+## 6. Table presentations
 
 About 40 minutes: 15 to prepare, then 5 minutes per table.
 

@@ -50,7 +50,8 @@ security-review:
   script:
     - git fetch --quiet origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
     - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" > mr.diff
-    - .venv/bin/python reference-pipeline/review.py --diff mr.diff --sweep > findings.json
+    # Bypasses count only once merged: read them from the target branch.
+    - REVIEW_SUPPRESSIONS_REF="origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" .venv/bin/python reference-pipeline/review.py --diff mr.diff --sweep > findings.json
     - cat findings.json
   after_script:
     - .venv/bin/python reference-pipeline/post_comment.py findings.json --suggest --diff mr.diff
