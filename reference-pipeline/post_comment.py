@@ -391,9 +391,9 @@ def main(argv=None):
         return 1 if args.strict else 0
 
     body = render(document)
-    suggestions = make_suggestions(document, args.diff) if args.suggest else []
     if args.print:
         print(body)
+        suggestions = make_suggestions(document, args.diff) if args.suggest else []
         for finding, fix in suggestions:
             print("\n--- suggested fix on %s:%s ---" % (finding["file"], finding["line_start"]))
             print(suggestion_body(finding, fix, args.platform or "github"))
@@ -416,6 +416,8 @@ def main(argv=None):
         return 1 if args.strict else 0
 
     print("Comment %s." % action)
+    # Fixes come after the summary, so a slow model can never hold the summary back.
+    suggestions = make_suggestions(document, args.diff) if args.suggest else []
     if suggestions:
         try:
             print("Posted %d suggested fix(es)." % post_suggestions(platform, target, suggestions))
