@@ -15,9 +15,24 @@ You need your own copy of this repository on GitHub or GitLab.
 - **GitHub:** create a new **public** repository and push this repository to it. It must be public: GitHub's free runners for public repositories have 16 GB of memory, which the model needs, while private repositories get 7 GB. Everything in this repository is deliberately vulnerable demo code, so it is safe to publish.
 - **GitLab:** create a new project and push this repository to it. Public or private both work.
 
+> **`mine` is a nickname for your repository.** Replace `<your-repository-url>` with your new repository's URL (for example `https://github.com/jsmith/review-bot-practice.git`), never the instructor's. If git says `remote mine already exists`, fix it with `git remote set-url mine <your-repository-url>`.
+
 ```bash
 git remote add mine <your-repository-url>
 git push mine HEAD:main
+```
+
+### Or fork it (GitHub only)
+
+Instead of creating an empty repository, you can fork this one: **Fork** at the top right of the repository page, on GitHub. A fork of a public repository is public, so the free runner has enough memory. Add your fork as `mine`, then follow the GitHub Actions steps below unchanged:
+
+> **Three fork gotchas.**
+> 1. **Turn Actions on.** A new fork has workflows switched off. Open your fork's **Actions** tab and click the green button to enable them, or nothing ever runs.
+> 2. **Point the pull request at your fork.** When you open the pull request, GitHub sets the base to the instructor's repository. Change **base repository** to your fork before you click Create, or your pull request lands in the instructor's repository.
+> 3. **GitLab cannot fork a GitHub repository.** On GitLab, create a new project and use the steps above.
+
+```bash
+git remote add mine https://github.com/<your-username>/isc2-2026-ai-code-review-workshop.git
 ```
 
 ## GitHub Actions
